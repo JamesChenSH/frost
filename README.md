@@ -16,7 +16,7 @@ zvm use 0.14.0
 ## TODOs
 
 - [x] Initialize development environment
-- [ ] Port TigerBeetle VOPR to this repository, run standalone on FoundationDB
+- [ ] (IN PROGRESS: JOHN) Port TigerBeetle VOPR to this repository, run standalone on FoundationDB
 - [ ] Evaluate FoundationDB simulator standalone
 - [ ] Evaluate YCSB with/without TigerBeetle VOPR on FoundationDB
 - [ ] Evaluate TigerBeetle VOPR on RocksDB
