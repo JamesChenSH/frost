@@ -12,3 +12,18 @@ After installing ZVM, to download and use the latest stable build, `0.14.0`, run
 zvm i 0.14.0 | zvm install 0.14.0
 zvm use 0.14.0
 ```
+
+## TODOs
+
+- [x] Initialize development environment
+- [ ] Port TigerBeetle VOPR to this repository, run standalone on FoundationDB
+- [ ] Evaluate FoundationDB simulator standalone
+- [ ] Evaluate YCSB with/without TigerBeetle VOPR on FoundationDB
+- [ ] Evaluate TigerBeetle VOPR on RocksDB
+- [ ] Evaluate YCSB with/without TigerBeetle VOPR on RocksDB
+- [ ] [Optional] Evaluate TigerBeetle VOPR on Cassandra
+- [ ] [Optional] Evaluate YCSB with/without TigerBeetle VOPR on Cassandra
+- [ ] [Optional] Evaluate TigerBeetle VOPR on Valkey
+- [ ] [Optional] Evaluate YCSB with/without TigerBeetle VOPR on Valkey
+- [ ] **DEADLINE: APR. 18** Final Report
+- [ ] **DEADLINE: APR. 18** Final Presentation @9:30 (15 min)
