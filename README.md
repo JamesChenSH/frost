@@ -4,7 +4,7 @@ FoundationDB is one of the progenitors of deterministic simulation testing (DST)
 
 ## Current development specifications
 
-This repository uses the nightly build of Zig, using [Zig Version Manager (ZVM)](https://www.zvm.app/).
+This repository uses the latest stable build of Zig 0.14.0, using [Zig Version Manager (ZVM)](https://www.zvm.app/).
 
 After installing ZVM, to download and use the latest stable build, `0.14.0`, run:
 
