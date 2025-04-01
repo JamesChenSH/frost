@@ -13,6 +13,12 @@ zvm i 0.14.0 | zvm install 0.14.0
 zvm use 0.14.0
 ```
 
+## Architecture
+
+The architecture of FRoST is roughly defined by the diagram below:
+
+![FRoST Architecture](./docs/assets/architecture.svg)
+
 ## TODOs
 
 - [x] Initialize development environment
