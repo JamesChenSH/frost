@@ -1,21 +1,37 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
-
 const std = @import("std");
 
+const Simulator = struct {
+    max_ticks: u32 = 40_000_000,
+    prng: std.Random.DefaultPrng,
+
+    pub fn init(seed: u64) Simulator {
+        // TigerBeetle uses their own implementation for PRNG
+        // For time purposes, we use the stdlib
+        // Ref: https://github.com/john-s-lin/tigerbeetle/blob/5e19a127302df339b57cdb9c4e64c5491be23e60/src/stdx/prng.zig#L9
+        const prng = std.Random.DefaultPrng.init(seed);
+        return Simulator{
+            .prng = prng,
+        };
+    }
+
+    pub fn random_u64(self: Simulator) u64 {
+        // NOTE: don't know why you have to copy a const into a var.
+        // FIX this
+        var prng = self.prng;
+        const rand = prng.random();
+        return rand.int(u64);
+    }
+};
+
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    // TODO provide random seed or seed from argument
+    const seed_random = std.crypto.random.int(u64);
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    const sim = Simulator.init(seed_random);
+    // It also works when seed is provided by user!
+    // TODO allow CLI args to accept user provided seed
+    // const sim = Simulator.init(0);
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush(); // Don't forget to flush!
+    const rand_int = sim.random_u64();
+    std.debug.print("{}\n", .{rand_int});
 }
