@@ -7,7 +7,7 @@ const Simulator = struct {
     pub fn init(seed: u64) Simulator {
         // TigerBeetle uses their own implementation for PRNG
         // For time purposes, we use the stdlib
-        // Ref: https://github.com/john-s-lin/tigerbeetle/blob/5e19a127302df339b57cdb9c4e64c5491be23e60/src/stdx/prng.zig#L9
+        // Ref: https://github.com/tigerbeetle/tigerbeetle/blob/78ed407ba07ae674e8feda52dadddba234f4b7f7/src/stdx/prng.zig#L9
         const prng = std.Random.DefaultPrng.init(seed);
         return Simulator{
             .prng = prng,
