@@ -22,8 +22,10 @@ The architecture of FRoST is roughly defined by the diagram below:
 ## TODOs
 
 - [x] Initialize development environment
-- [ ] (IN PROGRESS: JOHN) Port TigerBeetle VOPR to this repository, run standalone on FoundationDB
-- [ ] Evaluate FoundationDB simulator standalone
+- [ ] (IN PROGRESS: JOHN) Scratch standalone simulator based on TigerBeetle VOPR, PoC implementation
+- [ ] (IN PROGRESS: SHAOHONG) Evaluate FoundationDB simulator standalone: https://github.com/apple/foundationdb/tree/main/tests/TestRunner
+- [ ] (IN PROGRESS: SHAOHONG) Evaluate RocksDB simulator standalone: https://github.com/facebook/rocksdb/wiki/Stress-test
+- [ ] (IN PROGRESS: SHAOHONG) Evaluate Cassandra simulator standalone: https://cassandra.apache.org/doc/stable/cassandra/tools/cassandra_stress.html
 - [ ] Evaluate YCSB with/without TigerBeetle VOPR on FoundationDB
 - [ ] Evaluate TigerBeetle VOPR on RocksDB
 - [ ] Evaluate YCSB with/without TigerBeetle VOPR on RocksDB
