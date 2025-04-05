@@ -37,7 +37,8 @@ pub fn main() !void {
         \\-t, --ticks <u32>     An option parameter, takes max ticks
     );
 
-    // Clap parser is here
+    // CLI parse
+    // If any argument doesn't fit the above, return the help command
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
         .allocator = gpa.allocator(),
     }) catch {
