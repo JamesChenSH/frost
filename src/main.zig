@@ -36,8 +36,9 @@ const Event = struct {
 pub fn main() !void {
 
     // To parse CLI args
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     // These are all the CLI args for now
     // TODO add config file
@@ -51,7 +52,7 @@ pub fn main() !void {
     // CLI parse
     // If any argument doesn't fit the above, return the help command
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
-        .allocator = gpa.allocator(),
+        .allocator = allocator,
     }) catch {
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     };
@@ -78,12 +79,10 @@ pub fn main() !void {
     const rand_int = sim.random_u64();
     std.debug.print("rand int: {}\n", .{rand_int});
 
-    const heap_alloc = std.heap.page_allocator;
-
     const e1 = Event{ .timestamp = 0, .callback = "hello" };
     const e2 = Event{ .timestamp = 2, .callback = "world" };
 
-    var event_queue = std.ArrayList(Event).init(heap_alloc);
+    var event_queue = std.ArrayList(Event).init(allocator);
     defer event_queue.deinit();
     try event_queue.append(e1);
     try event_queue.append(e2);
