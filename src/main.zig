@@ -79,13 +79,10 @@ pub fn main() !void {
     const rand_int = sim.random_u64();
     std.debug.print("rand int: {}\n", .{rand_int});
 
-    const e1 = Event{ .timestamp = 0, .callback = "hello" };
-    const e2 = Event{ .timestamp = 2, .callback = "world" };
-
     var event_queue = std.ArrayList(Event).init(allocator);
     defer event_queue.deinit();
-    try event_queue.append(e1);
-    try event_queue.append(e2);
+    try event_queue.append(Event{ .timestamp = 0, .callback = "hello" });
+    try event_queue.append(Event{ .timestamp = 2, .callback = "world" });
 
     for (event_queue.items) |event| {
         std.debug.print("{any}", .{event});
