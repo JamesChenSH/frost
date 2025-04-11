@@ -22,17 +22,6 @@ const Simulator = struct {
     }
 };
 
-const Event = struct {
-    timestamp: u64,
-    callback: []const u8,
-
-    pub fn format(self: Event, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        _ = fmt;
-        _ = options;
-        try writer.print("Event: (timestamp = {d}, callback = {s})\n", .{ self.timestamp, self.callback });
-    }
-};
-
 pub fn main() !void {
 
     // To parse CLI args
@@ -78,13 +67,4 @@ pub fn main() !void {
 
     const rand_int = sim.random_u64();
     std.debug.print("rand int: {}\n", .{rand_int});
-
-    var event_queue = std.ArrayList(Event).init(allocator);
-    defer event_queue.deinit();
-    try event_queue.append(Event{ .timestamp = 0, .callback = "hello" });
-    try event_queue.append(Event{ .timestamp = 2, .callback = "world" });
-
-    for (event_queue.items) |event| {
-        std.debug.print("{any}", .{event});
-    }
 }
