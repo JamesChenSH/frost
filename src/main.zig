@@ -62,9 +62,8 @@ pub fn main() !void {
     // Initialize simulator
     var sim = Simulator.init(seed, max_ticks);
 
-    std.debug.print("seed: {}\n", .{seed});
-    std.debug.print("max_ticks: {}\n", .{max_ticks});
+    std.log.info("Starting simulation with seed: {}", .{seed});
+    std.log.info("Simulation max_ticks: {}", .{max_ticks});
 
-    const rand_int = sim.random_u64();
-    std.debug.print("rand int: {}\n", .{rand_int});
+    std.log.debug("Random int: {}", .{sim.random_u64()});
 }
