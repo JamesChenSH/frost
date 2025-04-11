@@ -44,6 +44,8 @@ pub const Simulator = struct {
         // Init Replicas
         for (0..config.num_replicas) |i| {
             // Pass network, etc.
+            // Use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
+            // Since ReplicaActor expects a u32 and i is a usize
             try replicas.append(actors.ReplicaActor.init(allocator, @truncate(i), &network));
         }
 
@@ -58,6 +60,8 @@ pub const Simulator = struct {
             try client_prngs_list.append(client_prng); // Store the PRNG
             // Client ID = 1000 + i for distinctness
             // Pass the corresponding PRNG by pointer
+            // Same as above. use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
+            // Since ClientActor expects a u32 and i is a usize
             try clients.append(actors.ClientActor.init(allocator, @truncate(1000 + i), &network, &client_prngs_list.items[i]));
         }
 
