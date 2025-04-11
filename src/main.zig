@@ -1,69 +1,53 @@
 const std = @import("std");
 const clap = @import("clap");
-
-const default_max_ticks: u32 = 40_000_000;
-
-const Simulator = struct {
-    max_ticks: u32,
-    prng: std.Random.DefaultPrng,
-
-    pub fn init(seed: u64, max_ticks: u32) Simulator {
-        // TigerBeetle uses their own implementation for PRNG
-        // For time purposes, we use the stdlib
-        // Ref: https://github.com/tigerbeetle/tigerbeetle/blob/78ed407ba07ae674e8feda52dadddba234f4b7f7/src/stdx/prng.zig#L9
-        return Simulator{
-            .prng = std.Random.DefaultPrng.init(seed),
-            .max_ticks = max_ticks,
-        };
-    }
-
-    pub fn random_u64(self: *Simulator) u64 {
-        return self.prng.random().int(u64);
-    }
-};
+const config = @import("config.zig");
+const Simulator = @import("simulator.zig").Simulator;
 
 pub fn main() !void {
-
-    // To parse CLI args
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // These are all the CLI args for now
-    // TODO add config file
-    // TODO take params outside of config file
+    // CLI args using defaults from config.zig
     const params = comptime clap.parseParamsComptime(
-        \\-h, --help            Display this help and exit.
-        \\-s, --seed <u64>      An option parameter, takes a seed
-        \\-t, --ticks <u32>     An option parameter, takes max ticks
+        \\-h, --help              Display this help and exit.
+        \\-s, --seed <u64>        Simulation seed (default: random)
+        \\-t, --ticks <u32>       Max simulation ticks
+        \\-r, --replicas <u32>    Number of replicas
+        \\-c, --clients <u32>     Number of clients
+        \\    --pause_prob <f32>  Replica pause probability per tick
     );
 
-    // CLI parse
-    // If any argument doesn't fit the above, return the help command
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
         .allocator = allocator,
-    }) catch {
+    }) catch |err| {
+        std.log.err("Input Error: {}\n", .{err});
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     };
     defer res.deinit();
 
-    // Display help if "-h, --help is called"
     if (res.args.help != 0) {
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
     }
 
-    // Set seed if seed not in args
-    const seed_random = std.crypto.random.int(u64);
-    const seed = if (res.args.seed) |s| s else seed_random;
+    // --- Build Configuration ---
+    // Use 'orelse' with defaults from config.zig
+    const seed: u64 = res.args.seed orelse std.crypto.random.int(u64);
+    const simulatorConfig = config.SimulationConfig{
+        .seed = seed,
+        .max_ticks = res.args.ticks orelse config.default_max_ticks,
+        .num_replicas = res.args.replicas orelse config.default_num_replicas,
+        .num_clients = res.args.clients orelse config.default_num_clients,
+        .replica_pause_probability = res.args.pause_prob orelse config.default_replica_pause_probability,
+    };
 
-    // Set max_ticks is ticks not in args
-    const max_ticks = if (res.args.ticks) |t| t else default_max_ticks;
+    std.log.info("Initializing simulation with config: {any}", .{config});
 
-    // Initialize simulator
-    var sim = Simulator.init(seed, max_ticks);
+    // --- Initialize and Run Simulator ---
+    var sim = try Simulator.init(allocator, simulatorConfig);
+    defer sim.deinit(); // Ensure cleanup
 
-    std.log.info("Starting simulation with seed: {}", .{seed});
-    std.log.info("Simulation max_ticks: {}", .{max_ticks});
+    try sim.run(); // Execute the main simulation loop
 
-    std.log.debug("Random int: {}", .{sim.random_u64()});
+    std.log.info("Simulation completed successfully.", .{});
 }
