@@ -34,7 +34,7 @@ pub const SimulationConfig = struct {
         try writer.print("\tnum_replicas: {},\n", .{self.num_replicas});
         try writer.print("\tnum_clients: {},\n", .{self.num_clients});
         try writer.print("\treplica_pause_probability: {d},\n", .{self.replica_pause_probability});
-        try writer.writeAll("}\n");
+        try writer.writeAll("}");
     }
 };
 
