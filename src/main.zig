@@ -1,5 +1,7 @@
 const std = @import("std");
+
 const clap = @import("clap");
+
 const config = @import("config.zig");
 const Simulator = @import("simulator.zig").Simulator;
 
