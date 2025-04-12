@@ -37,14 +37,18 @@ const fdb_bridge = struct {
 
     // Function to create a new database instance
     pub fn create_database() !*fdb.FDBDatabase {
-        var db: ?*fdb.FDBDatabase = undefined;
-        checkError(fdb.fdb_create_database("/etc/foundationdb/fdb.cluster", &db));
-        if (db == null) {
-            return error.DatabaseCreationFailed;
-        } else {
-            std.log.info("Created database", .{});
-            return db;
+        // Naming this db_opt since it's an optional
+        var db_opt: ?*fdb.FDBDatabase = undefined;
+        checkError(fdb.fdb_create_database("/etc/foundationdb/fdb.cluster", &db_opt));
+
+        // If db_opt is non-null, bind it to db_ptr
+        // which will have type *fdb.FDBDatabase
+        if (db_opt) |db_ptr| {
+            std.log.info("Created database pointer: {*any}", .{db_ptr});
+            return db_ptr;
         }
+        std.log.err("fdb_create_database succeeded but returned a null pointer", .{});
+        return error.DatabaseCreationFailed;
     }
 
     // Function to destroy the database instance
