@@ -18,6 +18,20 @@ zvm i 0.14.0 | zvm install 0.14.0
 zvm use 0.14.0
 ```
 
+You can build the simulator in debug spec with
+
+```bash
+zig build
+```
+
+and run the simulator with
+
+```bash
+./zig-out/bin/frost -h
+```
+
+to view available flags to set.
+
 ## Architecture
 
 The architecture of FRoST is roughly defined by the diagram below:
