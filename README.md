@@ -41,8 +41,10 @@ The architecture of FRoST is roughly defined by the diagram below:
 ## TODOs
 
 - [x] Initialize development environment
-- [ ] (IN PROGRESS: JOHN) Scratch standalone simulator based on TigerBeetle
+- [x] Scratch standalone simulator based on TigerBeetle
       VOPR, PoC implementation
+- [ ] (IN PROGRESS: JOHN) Implement Replica Resume after Pause during tick
+- [ ] (IN PROGRESS: JOHN) Explore refactoring tick using for-loop vs while loop
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate FoundationDB simulator standalone:
       https://github.com/apple/foundationdb/tree/main/tests/TestRunner
       Evaluate rocksdb backend performance on dst.
