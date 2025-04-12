@@ -90,4 +90,7 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    exe.linkSystemLibrary("fdb.c");
+    exe.addIncludePath("/usr/include/");
 }
