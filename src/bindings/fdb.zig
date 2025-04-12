@@ -42,7 +42,7 @@ const fdb_bridge = struct {
         if (db == null) {
             return error.DatabaseCreationFailed;
         } else {
-            std.log.info("Created Database", .{});
+            std.log.info("Created database", .{});
             return db;
         }
     }
