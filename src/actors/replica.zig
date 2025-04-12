@@ -1,5 +1,5 @@
-// src/actors/replica.zig
 const std = @import("std");
+
 const Network = @import("../network.zig").Network;
 const Simulator = @import("../simulator.zig").Simulator;
 

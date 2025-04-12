@@ -1,9 +1,11 @@
 const std = @import("std");
+
 const config = @import("config.zig");
 const PRNG = @import("prng.zig").PRNG;
 const Scheduler = @import("scheduler.zig").Scheduler;
 const Network = @import("network.zig").Network;
-const actors = @import("actors/mod.zig");
+const ReplicaActor = @import("actors/replica.zig").ReplicaActor;
+const ClientActor = @import("actors/client.zig").ClientActor;
 
 pub const Simulator = struct {
     simulation_config: config.SimulationConfig,
@@ -13,8 +15,8 @@ pub const Simulator = struct {
     // Core Components
     scheduler: Scheduler,
     network: Network,
-    replicas: std.ArrayList(actors.ReplicaActor),
-    clients: std.ArrayList(actors.ClientActor),
+    replicas: std.ArrayList(ReplicaActor),
+    clients: std.ArrayList(ClientActor),
 
     // Client PRNGs (Forked per client for determinism)
     // Store them here or within ClientActor depending on preference
@@ -32,10 +34,10 @@ pub const Simulator = struct {
         var scheduler = Scheduler.init(allocator);
         var network = Network.init(allocator, &scheduler, &network_prng);
 
-        var replicas = std.ArrayList(actors.ReplicaActor).init(allocator);
+        var replicas = std.ArrayList(ReplicaActor).init(allocator);
         errdefer replicas.deinit(); // Deinit already created replicas if client init fails below
 
-        var clients = std.ArrayList(actors.ClientActor).init(allocator);
+        var clients = std.ArrayList(ClientActor).init(allocator);
         errdefer clients.deinit(); // Deinit client list if something below fails
 
         var client_prngs_list = std.ArrayList(PRNG).init(allocator);
@@ -46,7 +48,7 @@ pub const Simulator = struct {
             // Pass network, etc.
             // Use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
             // Since ReplicaActor expects a u32 and i is a usize
-            try replicas.append(actors.ReplicaActor.init(allocator, @truncate(i), &network));
+            try replicas.append(ReplicaActor.init(allocator, @truncate(i), &network));
         }
 
         // Init Clients and their PRNGs
@@ -62,7 +64,7 @@ pub const Simulator = struct {
             // Pass the corresponding PRNG by pointer
             // Same as above. use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
             // Since ClientActor expects a u32 and i is a usize
-            try clients.append(actors.ClientActor.init(allocator, @truncate(1000 + i), &network, &client_prngs_list.items[i]));
+            try clients.append(ClientActor.init(allocator, @truncate(1000 + i), &network, &client_prngs_list.items[i]));
         }
 
         return Simulator{
