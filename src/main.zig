@@ -1,5 +1,7 @@
 const std = @import("std");
+
 const clap = @import("clap");
+
 const config = @import("config.zig");
 const Simulator = @import("simulator.zig").Simulator;
 
@@ -33,7 +35,7 @@ pub fn main() !void {
     // --- Build Configuration ---
     // Use 'orelse' with defaults from config.zig
     const seed: u64 = res.args.seed orelse std.crypto.random.int(u64);
-    const simulatorConfig = config.SimulationConfig{
+    const simulation_config = config.SimulationConfig{
         .seed = seed,
         .max_ticks = res.args.ticks orelse config.default_max_ticks,
         .num_replicas = res.args.replicas orelse config.default_num_replicas,
@@ -41,10 +43,10 @@ pub fn main() !void {
         .replica_pause_probability = res.args.pause_prob orelse config.default_replica_pause_probability,
     };
 
-    std.log.info("Initializing simulation with config: {any}", .{config});
+    std.log.info("Initializing simulation with config: {any}", .{simulation_config});
 
     // --- Initialize and Run Simulator ---
-    var sim = try Simulator.init(allocator, simulatorConfig);
+    var sim = try Simulator.init(allocator, simulation_config);
     defer sim.deinit(); // Ensure cleanup
 
     try sim.run(); // Execute the main simulation loop

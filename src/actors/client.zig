@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const Network = @import("../network.zig").Network;
 const PRNG = @import("../prng.zig").PRNG;
 const Simulator = @import("../simulator.zig").Simulator; // Forward declare
