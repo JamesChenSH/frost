@@ -1,12 +1,12 @@
 const std = @import("std");
-const config_mod = @import("config.zig");
+const config = @import("config.zig");
 const PRNG = @import("prng.zig").PRNG;
 const Scheduler = @import("scheduler.zig").Scheduler;
 const Network = @import("network.zig").Network;
 const actors = @import("actors/mod.zig");
 
 pub const Simulator = struct {
-    config: config_mod.SimulationConfig,
+    simulation_config: config.SimulationConfig,
     prng: PRNG, // Main PRNG for simulator-level decisions
     allocator: std.mem.Allocator,
 
@@ -23,8 +23,8 @@ pub const Simulator = struct {
     // TODO: Add History Recorder
     // TODO: Add Checker/Verifier
 
-    pub fn init(allocator: std.mem.Allocator, config: config_mod.SimulationConfig) !Simulator {
-        var simulator_prng = PRNG.init(config.seed);
+    pub fn init(allocator: std.mem.Allocator, simulation_config: config.SimulationConfig) !Simulator {
+        var simulator_prng = PRNG.init(simulation_config.seed);
         // Fork PRNGs deterministically *before* using the simulator_prng for anything else
         var network_prng = PRNG.init(simulator_prng.random().int(u64));
         var client_prng_master = PRNG.init(simulator_prng.random().int(u64));
@@ -42,7 +42,7 @@ pub const Simulator = struct {
         errdefer client_prngs_list.deinit(); // Deinit PRNG list if something below fails
 
         // Init Replicas
-        for (0..config.num_replicas) |i| {
+        for (0..simulation_config.num_replicas) |i| {
             // Pass network, etc.
             // Use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
             // Since ReplicaActor expects a u32 and i is a usize
@@ -54,7 +54,7 @@ pub const Simulator = struct {
             for (clients.items) |*c| c.deinit();
             // No need to deinit client_prngs items, they are structs
         }
-        for (0..config.num_clients) |i| {
+        for (0..simulation_config.num_clients) |i| {
             // Fork a PRNG for each client
             const client_prng = PRNG.init(client_prng_master.random().int(u64));
             try client_prngs_list.append(client_prng); // Store the PRNG
@@ -66,7 +66,7 @@ pub const Simulator = struct {
         }
 
         return Simulator{
-            .config = config,
+            .simulation_config = simulation_config,
             .prng = simulator_prng,
             .allocator = allocator,
             .scheduler = scheduler,
@@ -102,7 +102,7 @@ pub const Simulator = struct {
 
     pub fn run(self: *Simulator) !void {
         std.log.info("Starting simulation run...", .{});
-        while (self.scheduler.current_tick < self.config.max_ticks) {
+        while (self.scheduler.current_tick < self.simulation_config.max_ticks) {
             const current_tick = self.scheduler.current_tick;
 
             // 1. Inject Faults (Probabilistic)
@@ -130,7 +130,7 @@ pub const Simulator = struct {
             self.scheduler.advanceTick();
 
             if (current_tick % 500_000 == 0 and current_tick > 0) { // Log progress
-                std.log.info("Tick {} / {}", .{ current_tick, self.config.max_ticks });
+                std.log.info("Tick {} / {}", .{ current_tick, self.simulation_config.max_ticks });
             }
         }
         std.log.info("Simulation finished after {} ticks.", .{self.scheduler.current_tick});
@@ -152,7 +152,7 @@ pub const Simulator = struct {
             // }
 
             // Check Pause (only if running)
-            if (replica.state == .Running and self.randomF32() < self.config.replica_pause_probability) {
+            if (replica.state == .Running and self.randomF32() < self.simulation_config.replica_pause_probability) {
                 std.log.warn("Injecting PAUSE fault for Replica {} at tick {}", .{ replica.id, current_tick });
                 replica.pauseReplica();
                 // TODO: Schedule an EndPause event using the scheduler

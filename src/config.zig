@@ -18,6 +18,24 @@ pub const SimulationConfig = struct {
     // TODO: Add network partition config
     // TODO: Add DB-specific options (union based on target DB)
     // TODO: Add workload configuration
+
+    pub fn format(
+        self: @This(),
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.writeAll("Config{\n");
+        try writer.print("\tseed: {},\n", .{self.seed});
+        try writer.print("\tmax_ticks: {},\n", .{self.max_ticks});
+        try writer.print("\tnum_replicas: {},\n", .{self.num_replicas});
+        try writer.print("\tnum_clients: {},\n", .{self.num_clients});
+        try writer.print("\treplica_pause_probability: {},\n", .{self.replica_pause_probability});
+        try writer.writeAll("}\n");
+    }
 };
 
 // Potential future function for loading from file
