@@ -6,7 +6,6 @@ pub const Scheduler = struct {
     // TODO: Implement event queue (priority queue based on virtual time)
     // TODO: Manage runnable actors
     allocator: std.mem.Allocator,
-    current_tick: u32 = 0, // Scheduler needs to know the time for scheduling
 
     pub fn init(allocator: std.mem.Allocator) Scheduler {
         return Scheduler{ .allocator = allocator };
@@ -28,19 +27,17 @@ pub const Scheduler = struct {
 
     // Changed sim parameter type to avoid circular dependency issues initially.
     // Pass only needed parts or use interfaces later.
-    pub fn runTick(self: *Scheduler, sim_prng: *std.Random.DefaultPrng) !void {
+    pub fn runTick(self: *Scheduler, sim_prng: *std.Random.DefaultPrng, current_tick: u32) !void {
+        _ = self;
+        _ = sim_prng; // silence unused
+
         // TODO: Process events scheduled for self.current_tick
         // TODO: Decide which actors run this tick (using sim_prng for determinism)
         // TODO: Return list of actors to run, or directly call their 'step' methods?
         // TODO: Potentially trigger faults via sim.injectFaults() (maybe move fault injection call?)
 
-        if (self.current_tick % 100_000 == 0) { // Log progress occasionally
-            std.log.debug("Scheduler running tick {}", .{self.current_tick});
+        if (current_tick % 100_000 == 0) { // Log progress occasionally
+            std.log.debug("Scheduler running tick {}", .{current_tick});
         }
-        _ = sim_prng; // silence unused
-    }
-
-    pub fn advanceTick(self: *Scheduler) void {
-        self.current_tick += 1;
     }
 };

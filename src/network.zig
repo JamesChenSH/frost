@@ -24,10 +24,10 @@ pub const Network = struct {
         _ = self;
     }
 
-    pub fn sendMessage(self: *Network, from_actor: u32, to_actor: u32, payload: anytype) !void {
+    pub fn sendMessage(self: *Network, from_actor: u32, to_actor: u32, payload: anytype, current_tick: u32) !void {
         // TODO: Use PRNG and config to determine latency
         const latency: u32 = 1 + self.prng.random().uintLessThan(u32, 10); // Example
-        const delivery_tick = self.scheduler.current_tick + latency; // Use scheduler's time
+        const delivery_tick = current_tick + latency; // Use scheduler's time
 
         // TODO: Use PRNG and config to check for drops/partitions
 
@@ -35,7 +35,7 @@ pub const Network = struct {
         const deliver_event = .{ .to = to_actor, .payload = payload }; // Placeholder
         try self.scheduler.scheduleEvent(delivery_tick, deliver_event);
 
-        std.log.debug("Network sending message from {} to {} @ tick {} (delivers @ {})", .{ from_actor, to_actor, self.scheduler.current_tick, delivery_tick });
+        std.log.debug("Network sending message from {} to {} @ tick {} (delivers @ {})", .{ from_actor, to_actor, current_tick, delivery_tick });
         // TODO: Figure out what to do with payload
         // _ = payload; // Silence unused warning
     }
