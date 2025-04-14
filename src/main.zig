@@ -18,6 +18,7 @@ pub fn main() !void {
         \\-r, --replicas <u32>    Number of replicas
         \\-c, --clients <u32>     Number of clients
         \\    --pause_prob <f32>  Replica pause probability per tick
+        \\    --resume_prob <f32> Replica resume probability per tick
     );
 
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
@@ -41,6 +42,7 @@ pub fn main() !void {
         .num_replicas = res.args.replicas orelse config.default_num_replicas,
         .num_clients = res.args.clients orelse config.default_num_clients,
         .replica_pause_probability = res.args.pause_prob orelse config.default_replica_pause_probability,
+        .replica_resume_probability = res.args.resume_prob orelse config.default_replica_resume_probability,
     };
 
     std.log.info("Initializing simulation with config: {any}", .{simulation_config});
