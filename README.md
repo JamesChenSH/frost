@@ -46,11 +46,14 @@ The architecture of FRoST is roughly defined by the diagram below:
 - [ ] (IN PROGRESS: JOHN) Implement Replica Resume after Pause during tick
 - [ ] (IN PROGRESS: JOHN) Explore refactoring tick using for-loop vs while loop
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate FoundationDB simulator standalone:
+
       https://github.com/apple/foundationdb/tree/main/tests/TestRunner
-      Evaluate rocksdb backend performance on dst.
+
+      Evaluate rocksdb backend performance on dst. **Hanged**
       https://github.com/apple/foundationdb/pull/11790
 
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate RocksDB simulator standalone:
+
       https://github.com/facebook/rocksdb/wiki/Stress-test 
       RocksDB Simulator is served for stress tests on its caching mechanism, and 
       is not deterministic, nor able to simulate workloads in a shorter time scale. 
@@ -61,6 +64,7 @@ The architecture of FRoST is roughly defined by the diagram below:
       https://forums.foundationdb.org/t/rocksdb-backend/845/9 
       
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate Cassandra simulator standalone:
+
       https://cassandra.apache.org/doc/stable/cassandra/tools/cassandra_stress.html
       https://cassandra.apache.org/_/blog/Testing-Apache-Cassandra-4.html
       
