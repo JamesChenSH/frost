@@ -43,7 +43,7 @@ The architecture of FRoST is roughly defined by the diagram below:
 - [x] Initialize development environment
 - [x] Scratch standalone simulator based on TigerBeetle
       VOPR, PoC implementation
-- [ ] (IN PROGRESS: JOHN) Implement Replica Resume after Pause during tick
+- [x] Implement Replica Resume after Pause during tick
 - [ ] (IN PROGRESS: JOHN) Explore refactoring tick using for-loop vs while loop
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate FoundationDB simulator standalone:
       https://github.com/apple/foundationdb/tree/main/tests/TestRunner
