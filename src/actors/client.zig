@@ -46,7 +46,7 @@ pub const ClientActor = struct {
             std.log.debug("Client {} performing action targeting replica {} @ tick {} (placeholder)", .{ self.id, target_replica_id, current_tick });
             // Example: Send a dummy message to a replica
             // Actor IDs need careful management. Assume replica IDs are 0..N-1
-            try self.network.sendMessage(self.id, target_replica_id, .{ .op = "dummy" });
+            try self.network.sendMessage(self.id, target_replica_id, .{ .op = "dummy" }, current_tick);
         }
     }
 };
