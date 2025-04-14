@@ -18,12 +18,12 @@ const RocksDB = struct {
                 len += 1;
             }
             const error_slice: []u8 = err_ptr[0..len];
+            std.log.debug("error: {s}", .{error_slice});
 
             return .{ .val = null, .err = error_slice };
         } else {
-            return .{ .val = null, .err = "" };
+            return .{ .val = RocksDB{ .db = db.? }, .err = null };
         }
-        return .{ .val = RocksDB{ .db = db.? }, .err = null };
     }
 
     fn close(self: RocksDB) void {
@@ -156,11 +156,11 @@ const RocksDB = struct {
 };
 
 pub fn main() !void {
-    std.log.info("123", .{});
-    const openRes = RocksDB.open("/tmp/db");
+    const openRes = RocksDB.open("/users/chens266/project/frost/src/bindings/rocksdb/tmp/db");
     if (openRes.err) |err| {
         std.debug.print("Failed to open: {s}.\n", .{err});
     }
+
     var db = openRes.val.?;
     defer db.close();
 
