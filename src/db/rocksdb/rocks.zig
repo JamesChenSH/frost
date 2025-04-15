@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const rdb = @cImport({
     @cInclude("rocksdb/c.h");
@@ -55,24 +56,26 @@ const RocksDB = struct {
         return null;
     }
 
-    pub fn get(self: RocksDB, key: [:0]const u8) struct { val: ?[]u8, err: ?[]u8 } {
+    pub fn get(self: RocksDB, key: [:0]const u8, allocator: Allocator) struct { val: ?[]u8, err: ?[]u8 } {
         const readOptions = rdb.rocksdb_readoptions_create();
         var valueLength: usize = 0;
-        var err: ?[*]u8 = null;
+        var err_ptr: ?[*]u8 = null;
         var v = rdb.rocksdb_get(
             self.db,
             readOptions,
             key.ptr,
             key.len,
             &valueLength,
-            &err,
+            &err_ptr,
         );
-        if (err) |err_ptr| {
+        if (err_ptr) |err| {
+            defer rdb.rocksdb_free(err);
             var len: usize = 0;
-            while (err_ptr[len] != 0) {
+            while (err[len] != 0) {
                 len += 1;
             }
-            const error_slice: []u8 = err_ptr[0..len];
+            const error_slice: []u8 = err[0..len];
+            rdb.rocksdb_free(v);
 
             return .{ .val = null, .err = error_slice };
         }
@@ -80,7 +83,15 @@ const RocksDB = struct {
             return .{ .val = null, .err = null };
         }
 
-        return .{ .val = v[0..valueLength], .err = null };
+        const value_slice = allocator.alloc(u8, valueLength) catch |err| {
+            std.log.err("Failed to allocate memory for RocksDB get result: {}", .{err});
+            // Must still free result_ptr if allocation fails! The defer handles this.
+            return error.MemoryAllocationFailed;
+        };
+
+        @memcpy(value_slice, v[0..valueLength]);
+
+        return .{ .val = value_slice, .err = null };
     }
 
     const IterEntry = struct {
@@ -161,6 +172,9 @@ pub fn main() !void {
         std.debug.print("Failed to open: {s}.\n", .{err});
     }
 
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    const allocator = arena.allocator();
+
     var db = openRes.val.?;
     defer db.deinit();
 
@@ -195,7 +209,7 @@ pub fn main() !void {
             return;
         }
     } else if (std.mem.eql(u8, command, "get")) {
-        const getRes = db.get(key);
+        const getRes = db.get(key, allocator);
         if (getRes.err) |err| {
             std.debug.print("Error getting key: {s}.\n", .{err});
             return;
