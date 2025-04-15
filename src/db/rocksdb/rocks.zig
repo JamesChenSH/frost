@@ -26,7 +26,7 @@ const RocksDB = struct {
         }
     }
 
-    fn close(self: RocksDB) void {
+    pub fn deinit(self: RocksDB) void {
         rdb.rocksdb_close(self.db);
     }
 
@@ -55,7 +55,7 @@ const RocksDB = struct {
         return null;
     }
 
-    fn get(self: RocksDB, key: [:0]const u8, allocator: ) struct { val: ?[]u8, err: ?[]u8 } {
+    pub fn get(self: RocksDB, key: [:0]const u8) struct { val: ?[]u8, err: ?[]u8 } {
         const readOptions = rdb.rocksdb_readoptions_create();
         var valueLength: usize = 0;
         var err: ?[*]u8 = null;
@@ -124,12 +124,12 @@ const RocksDB = struct {
             };
         }
 
-        fn close(self: Iter) void {
+        fn deinit(self: Iter) void {
             rdb.rocksdb_iter_destroy(self.iter);
         }
     };
 
-    fn iter(self: RocksDB, prefix: [:0]const u8) struct { val: ?Iter, err: ?[]const u8 } {
+    pub fn iter(self: RocksDB, prefix: [:0]const u8) struct { val: ?Iter, err: ?[]const u8 } {
         const readOptions = rdb.rocksdb_readoptions_create();
         var it = Iter{
             .iter = undefined,
@@ -156,13 +156,13 @@ const RocksDB = struct {
 };
 
 pub fn main() !void {
-    const openRes = RocksDB.open("/users/chens266/project/frost/src/bindings/rocksdb/tmp/db");
+    const openRes = RocksDB.init("/users/chens266/project/frost/src/db/rocksdb/tmp/db");
     if (openRes.err) |err| {
         std.debug.print("Failed to open: {s}.\n", .{err});
     }
 
     var db = openRes.val.?;
-    defer db.close();
+    defer db.deinit();
 
     var args = std.process.args();
     _ = args.next();
@@ -189,7 +189,7 @@ pub fn main() !void {
     }
 
     if (std.mem.eql(u8, command, "set")) {
-        const setErr = db.set(key, value);
+        const setErr = db.put(key, value);
         if (setErr) |err| {
             std.debug.print("Error setting key: {s}.\n", .{err});
             return;
@@ -213,7 +213,7 @@ pub fn main() !void {
             std.debug.print("Error getting iterator: {s}.\n", .{err});
         }
         var iter = iterRes.val.?;
-        defer iter.close();
+        defer iter.deinit();
         while (iter.next()) |entry| {
             std.debug.print("{s} = {s}\n", .{ entry.key, entry.value });
         }
