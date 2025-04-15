@@ -8,11 +8,16 @@ const rdb = @cImport({
 const RocksDB = struct {
     db: *rdb.rocksdb_t,
 
-    pub fn init(dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
+    pub fn init(allocator: Allocator, dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
         const options: ?*rdb.rocksdb_options_t = rdb.rocksdb_options_create();
         rdb.rocksdb_options_set_create_if_missing(options, 1);
+
+        const c_db_path = try allocator.allocSentinel(u8, dir.len, 0);
+        defer allocator.free(c_db_path);
+        @memcpy(c_db_path.ptr[0..dir.len], dir);
+
         var err: ?[*]u8 = null;
-        const db: ?*rdb.rocksdb_t = rdb.rocksdb_open(options, dir.ptr, &err);
+        const db: ?*rdb.rocksdb_t = rdb.rocksdb_open(options, c_db_path.ptr, &err);
         if (err) |err_ptr| {
             var len: usize = 0;
             while (err_ptr[len] != 0) {

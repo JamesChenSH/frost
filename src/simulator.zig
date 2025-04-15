@@ -7,8 +7,6 @@ const Network = @import("network.zig").Network;
 const ReplicaActor = @import("actors/replica.zig").ReplicaActor;
 const ClientActor = @import("actors/client.zig").ClientActor;
 
-const Adaptor = @import("db/adapter.zig").DbAdapter;
-
 pub const Simulator = struct {
     simulation_config: config.SimulationConfig,
     prng: PRNG, // Main PRNG for simulator-level decisions
