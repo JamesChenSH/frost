@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 const log = std.log.scoped(.db_adapter);
 
 // Import the concrete database implementations we want to adapt
-const rocksdb_binding = @import("./bindings/rocksdb/rocks.zig");
+const rocksdb_binding = @import("./rocksdb/rocks.zig");
 // const fdb_binding = @import("fdb_binding.zig"); // Example for the future
 
 // --- Public Interface ---
