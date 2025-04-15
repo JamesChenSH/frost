@@ -7,7 +7,7 @@ const rdb = @cImport({
 const RocksDB = struct {
     db: *rdb.rocksdb_t,
 
-    fn open(dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
+    pub fn init(dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
         const options: ?*rdb.rocksdb_options_t = rdb.rocksdb_options_create();
         rdb.rocksdb_options_set_create_if_missing(options, 1);
         var err: ?[*]u8 = null;
@@ -30,7 +30,7 @@ const RocksDB = struct {
         rdb.rocksdb_close(self.db);
     }
 
-    fn set(self: RocksDB, key: [:0]const u8, value: [:0]const u8) ?[]u8 {
+    pub fn put(self: RocksDB, key: [:0]const u8, value: [:0]const u8) ?[]u8 {
         const writeOptions = rdb.rocksdb_writeoptions_create();
         var err: ?[*]u8 = null;
         rdb.rocksdb_put(
@@ -55,7 +55,7 @@ const RocksDB = struct {
         return null;
     }
 
-    fn get(self: RocksDB, key: [:0]const u8) struct { val: ?[]u8, err: ?[]u8 } {
+    fn get(self: RocksDB, key: [:0]const u8, allocator: ) struct { val: ?[]u8, err: ?[]u8 } {
         const readOptions = rdb.rocksdb_readoptions_create();
         var valueLength: usize = 0;
         var err: ?[*]u8 = null;
