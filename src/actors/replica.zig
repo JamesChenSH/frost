@@ -46,15 +46,12 @@ pub const ReplicaActor = struct {
 
     pub fn pauseReplica(self: *ReplicaActor) void {
         if (self.state == .Running) {
-            std.log.warn("Pausing Replica {}", .{self.id});
             self.state = .Paused;
-            // TODO: Schedule an 'EndPause' event? Or handle in scheduler?
         }
     }
 
     pub fn resumeReplica(self: *ReplicaActor) void {
         if (self.state == .Paused) {
-            std.log.warn("Resuming Replica {}", .{self.id});
             self.state = .Running;
         }
     }
@@ -62,9 +59,7 @@ pub const ReplicaActor = struct {
     // TODO: Not implemented yet
     // pub fn crashReplica(self: *ReplicaActor) void {
     //     if (self.state != .Crashed) {
-    //         std.log.err("Crashing Replica {}", .{self.id});
     //         self.state = .Crashed;
-    //         // TODO: Maybe release resources? Depends on crash model.
     //     }
     // }
 };

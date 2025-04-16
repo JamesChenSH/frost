@@ -104,14 +104,15 @@ pub const Simulator = struct {
 
     pub fn run(self: *Simulator) !void {
         std.log.info("Starting simulation run...", .{});
-        while (self.scheduler.current_tick < self.simulation_config.max_ticks) {
-            const current_tick = self.scheduler.current_tick;
+        var current_tick: u32 = 0;
+        for (0..self.simulation_config.max_ticks) |curr_tick_usize| {
+            current_tick = @intCast(curr_tick_usize);
 
-            // 1. Inject Faults (Probabilistic)
-            try self.injectFaults(current_tick);
+            // 1. Update replica states (probabilistic)
+            try self.updateReplicaStates(current_tick);
 
             // 2. Advance Scheduler & Process Events
-            try self.scheduler.runTick(&self.prng);
+            try self.scheduler.runTick(&self.prng, current_tick);
             // TODO: The scheduler should ideally tell the simulator which actors need stepping
             // based on events (e.g., message delivery, timer expiry).
 
@@ -128,20 +129,17 @@ pub const Simulator = struct {
                 try replica.step(&self.prng);
             }
 
-            // 4. Advance Time (handled by scheduler now)
-            self.scheduler.advanceTick();
-
             if (current_tick % 500_000 == 0 and current_tick > 0) { // Log progress
                 std.log.info("Tick {} / {}", .{ current_tick, self.simulation_config.max_ticks });
             }
         }
-        std.log.info("Simulation finished after {} ticks.", .{self.scheduler.current_tick});
+        std.log.info("Simulation finished after {} ticks.", .{current_tick});
 
         // TODO: Run Verifier/Checker on recorded history
     }
 
-    fn injectFaults(self: *Simulator, current_tick: u32) !void {
-        // Inject Replica Faults
+    fn updateReplicaStates(self: *Simulator, current_tick: u32) !void {
+        // Iterate through replicas to update state
         for (self.replicas.items) |*replica| {
             if (replica.state == .Crashed) continue; // Don't inject into crashed replicas
 
@@ -160,6 +158,12 @@ pub const Simulator = struct {
                 // TODO: Schedule an EndPause event using the scheduler
                 // const pause_duration = 100 + @intCast(self.randomU64() % 900); // Example
                 // try self.scheduler.scheduleEvent(current_tick + pause_duration, .{ .resume_replica = replica.id });
+            }
+
+            // Resume paused states
+            if (replica.state == .Paused and self.randomF32() < self.simulation_config.replica_resume_probability) {
+                std.log.warn("RESUME event for Replica {} at tick {}", .{ replica.id, current_tick });
+                replica.resumeReplica();
             }
         }
 
