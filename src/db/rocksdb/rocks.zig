@@ -1,47 +1,105 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const log = std.log.scoped(.rocksdb);
 
 const rdb = @cImport({
     @cInclude("rocksdb/c.h");
 });
 
-const RocksDB = struct {
-    db: *rdb.rocksdb_t,
+/// Errors specific to RocksDB operations.
+pub const RocksDBError = error{
+    OpenFailed,
+    CloseFailed, // Although deinit returns void, an error could theoretically occur
+    PutFailed,
+    GetFailed,
+    NotFound, // Specific error for key not found in Get
+    OptionsCreationFailed,
+    DatabasePathError, // Error converting path to C string
+    MemoryAllocationFailed,
+    NotInitialized, // If trying to use a deinitialized instance,
+    IteratorFailed,
+};
 
-    pub fn init(allocator: Allocator, dir: []const u8) struct { val: ?RocksDB, err: ?[]u8 } {
-        const options: ?*rdb.rocksdb_options_t = rdb.rocksdb_options_create();
-        rdb.rocksdb_options_set_create_if_missing(options, 1);
+pub const RocksDB = struct {
+    options: ?*rdb.rocksdb_options_t = null, // Only needed during init
+    write_options: ?*rdb.rocksdb_writeoptions_t = null,
+    read_options: ?*rdb.rocksdb_readoptions_t = null,
+    db: ?*rdb.rocksdb_t = null,
+    allocator: Allocator,
+
+    pub fn init(allocator: Allocator, dir: []const u8) !RocksDB {
+        log.debug("Initializing RocksDB at path: {s}", .{dir});
+
+        var self = RocksDB{ .allocator = allocator };
+
+        self.options = rdb.rocksdb_options_create();
+        if (self.options == null) {
+            return error.OptionsCreationFailed;
+        }
+
+        rdb.rocksdb_options_set_create_if_missing(self.options.?, 1);
+
+        // Options Operations
+        self.write_options = rdb.rocksdb_writeoptions_create();
+        if (self.write_options == null) {
+            return error.OptionsCreationFailed;
+        }
+        defer if (self.db == null and self.write_options != null) {
+            rdb.rocksdb_writeoptions_destroy(self.write_options.?);
+        };
+        self.read_options = rdb.rocksdb_readoptions_create();
+        if (self.read_options == null) {
+            return error.OptionsCreationFailed;
+        }
+        defer if (self.db == null and self.read_options != null) {
+            rdb.rocksdb_readoptions_destroy(self.read_options.?);
+        };
 
         const c_db_path = try allocator.allocSentinel(u8, dir.len, 0);
         defer allocator.free(c_db_path);
         @memcpy(c_db_path.ptr[0..dir.len], dir);
 
         var err: ?[*]u8 = null;
-        const db: ?*rdb.rocksdb_t = rdb.rocksdb_open(options, c_db_path.ptr, &err);
+        self.db = rdb.rocksdb_open(self.options.?, c_db_path.ptr, &err);
         if (err) |err_ptr| {
             var len: usize = 0;
             while (err_ptr[len] != 0) {
                 len += 1;
             }
             const error_slice: []u8 = err_ptr[0..len];
-            std.log.debug("error: {s}", .{error_slice});
-
-            return .{ .val = null, .err = error_slice };
+            log.debug("error: {s}", .{error_slice});
+            self.db = null;
+            return error.OpenFailed;
         } else {
-            return .{ .val = RocksDB{ .db = db.? }, .err = null };
+            log.info("Opened DB at {s} successfully", .{dir});
+            return self;
         }
     }
 
-    pub fn deinit(self: RocksDB) void {
-        rdb.rocksdb_close(self.db);
+    pub fn deinit(self: *RocksDB) void {
+        if (self.db) |db_handle| {
+            rdb.rocksdb_close(db_handle);
+            self.db = null;
+        }
+        if (self.write_options) |wo| {
+            rdb.rocksdb_writeoptions_destroy(wo);
+            self.write_options = null;
+        }
+        if (self.read_options) |ro| {
+            rdb.rocksdb_readoptions_destroy(ro);
+            self.read_options = null;
+        }
+        if (self.options) |opt| {
+            rdb.rocksdb_options_destroy(opt);
+            self.options = null;
+        }
     }
 
-    pub fn put(self: RocksDB, key: [:0]const u8, value: [:0]const u8) ?[]u8 {
-        const writeOptions = rdb.rocksdb_writeoptions_create();
+    pub fn put(self: *RocksDB, key: []const u8, value: []const u8) !void {
         var err: ?[*]u8 = null;
         rdb.rocksdb_put(
             self.db,
-            writeOptions,
+            self.write_options,
             key.ptr,
             key.len,
             value.ptr,
@@ -54,20 +112,17 @@ const RocksDB = struct {
                 len += 1;
             }
             const error_slice: []u8 = err_ptr[0..len];
-
-            return error_slice;
+            log.err("Error: {s}", .{error_slice});
+            return error.PutFailed;
         }
-
-        return null;
     }
 
-    pub fn get(self: RocksDB, key: [:0]const u8, allocator: Allocator) struct { val: ?[]u8, err: ?[]u8 } {
-        const readOptions = rdb.rocksdb_readoptions_create();
+    pub fn get(self: *RocksDB, key: []const u8, allocator: Allocator) !?[]u8 {
         var valueLength: usize = 0;
         var err_ptr: ?[*]u8 = null;
         var v = rdb.rocksdb_get(
             self.db,
-            readOptions,
+            self.read_options,
             key.ptr,
             key.len,
             &valueLength,
@@ -80,12 +135,13 @@ const RocksDB = struct {
                 len += 1;
             }
             const error_slice: []u8 = err[0..len];
+            log.err("Error: {s}", .{error_slice});
             rdb.rocksdb_free(v);
 
-            return .{ .val = null, .err = error_slice };
+            return error.GetFailed;
         }
         if (v == 0) {
-            return .{ .val = null, .err = null };
+            return error.NotFound;
         }
 
         const value_slice = allocator.alloc(u8, valueLength) catch |err| {
@@ -96,7 +152,7 @@ const RocksDB = struct {
 
         @memcpy(value_slice, v[0..valueLength]);
 
-        return .{ .val = value_slice, .err = null };
+        return value_slice;
     }
 
     const IterEntry = struct {
@@ -145,7 +201,7 @@ const RocksDB = struct {
         }
     };
 
-    pub fn iter(self: RocksDB, prefix: [:0]const u8) struct { val: ?Iter, err: ?[]const u8 } {
+    pub fn iter(self: *RocksDB, prefix: [:0]const u8) !?Iter {
         const readOptions = rdb.rocksdb_readoptions_create();
         var it = Iter{
             .iter = undefined,
@@ -155,7 +211,8 @@ const RocksDB = struct {
         if (rdb.rocksdb_create_iterator(self.db, readOptions)) |i| {
             it.iter = i;
         } else {
-            return .{ .val = null, .err = "Could not create iterator" };
+            log.err("Error: Iterator Creation Failed", .{});
+            return error.IteratorFailed;
         }
 
         if (prefix.len > 0) {
@@ -167,7 +224,7 @@ const RocksDB = struct {
         } else {
             rdb.rocksdb_iter_seek_to_first(it.iter);
         }
-        return .{ .val = it, .err = null };
+        return it;
     }
 };
 

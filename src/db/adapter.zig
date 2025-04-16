@@ -129,7 +129,7 @@ const DbImpl = union(enum) {
     fn get(self: *DbImpl, key: []const u8, allocator: Allocator) DbError!?[]u8 {
         std.log.info("{}", .{allocator});
         switch (self.*) {
-            .RocksDB => |*db| return db.get(self.RocksDB, key) catch |err| {
+            .RocksDB => |*db| return db.get(key, allocator) catch |err| {
                 // Handle specific errors like NotFound vs other errors if possible
                 if (err == rocksdb_binding.RocksDBError.NotFound) return null; // Map NotFound to null
                 log.err("RocksDB get failed: {s}", .{@errorName(err)});
@@ -141,8 +141,106 @@ const DbImpl = union(enum) {
     }
 };
 
-// --- Tests (Optional but Recommended) ---
-// You would typically add tests here to verify the adapter works correctly,
-// potentially using a mock or the actual RocksDB binding if dependencies allow.
-// test "init and deinit RocksDB adapter" { ... }
-// test "put and get via RocksDB adapter" { ... }
+// --- Tests ---
+// Ensure this is within the file scope, after the DbAdapter definition.
+const testing = std.testing;
+const fs = std.fs;
+const cwd = std.fs.cwd();
+
+test "DbAdapter init, deinit with RocksDB" {
+    const allocator = testing.allocator;
+    const test_db_path = "./test_adapter_init_deinit_db";
+
+    // Ensure clean state before test
+    _ = cwd.deleteTree(test_db_path) catch {}; // Ignore error if not exists
+    defer { // Ensure cleanup after test
+        _ = cwd.deleteTree(test_db_path) catch {};
+    }
+
+    const config = DbConfig{ .path = test_db_path };
+
+    // Init
+    var adapter = try DbAdapter.init(allocator, .RocksDB, config);
+    // Check if the allocator was stored (simple check)
+    // try testing.expect(adapter.allocator.raw_allocator == allocator.raw_allocator);
+    // Check if the impl is RocksDB
+    try testing.expect(adapter.impl == .RocksDB);
+
+    // Deinit (happens in defer)
+    defer adapter.deinit();
+
+    // Check if the DB directory was created
+    var dir = try cwd.openDir(test_db_path, .{});
+    defer dir.close();
+}
+
+test "DbAdapter put and get with RocksDB" {
+    const allocator = testing.allocator;
+    const test_db_path = "./test_adapter_put_get_db";
+
+    // Ensure clean state before test
+    _ = cwd.deleteTree(test_db_path) catch {}; // Ignore error if not exists
+    defer { // Ensure cleanup after test
+        _ = cwd.deleteTree(test_db_path) catch {};
+    }
+
+    const config = DbConfig{ .path = test_db_path };
+    var adapter = try DbAdapter.init(allocator, .RocksDB, config);
+    defer adapter.deinit();
+
+    const key1 = "mykey";
+    const val1 = "myvalue";
+    const key2 = "anotherkey";
+    const val2 = "anothervalue123";
+    const key_notfound = "missingkey";
+
+    // Put first key-value
+    try adapter.put(key1, val1);
+
+    // Get first key-value
+    const retrieved_val1 = try adapter.get(key1, allocator);
+    try testing.expect(retrieved_val1 != null);
+    // IMPORTANT: Free the memory returned by get!
+    defer if (retrieved_val1) |slice| allocator.free(slice);
+    try testing.expectEqualStrings(val1, retrieved_val1.?);
+
+    // Put second key-value
+    try adapter.put(key2, val2);
+
+    // Get second key-value
+    const retrieved_val2 = try adapter.get(key2, allocator);
+    try testing.expect(retrieved_val2 != null);
+    defer if (retrieved_val2) |slice| allocator.free(slice);
+    try testing.expectEqualStrings(val2, retrieved_val2.?);
+
+    // Get first key again
+    const retrieved_val1_again = try adapter.get(key1, allocator);
+    try testing.expect(retrieved_val1_again != null);
+    defer if (retrieved_val1_again) |slice| allocator.free(slice);
+    try testing.expectEqualStrings(val1, retrieved_val1_again.?);
+
+    // Get non-existent key
+    const retrieved_missing = try adapter.get(key_notfound, allocator);
+    try testing.expect(retrieved_missing == null);
+    // No need to free if null
+}
+
+test "DbAdapter get non-existent key returns null" {
+    const allocator = testing.allocator;
+    const test_db_path = "./test_adapter_get_null_db";
+
+    // Ensure clean state before test
+    _ = cwd.deleteTree(test_db_path) catch {}; // Ignore error if not exists
+    defer { // Ensure cleanup after test
+        _ = cwd.deleteTree(test_db_path) catch {};
+    }
+
+    const config = DbConfig{ .path = test_db_path };
+    var adapter = try DbAdapter.init(allocator, .RocksDB, config);
+    defer adapter.deinit();
+
+    const key_notfound = "this_key_does_not_exist";
+
+    const result = try adapter.get(key_notfound, allocator);
+    try testing.expect(result == null);
+}

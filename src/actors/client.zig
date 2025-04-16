@@ -3,7 +3,6 @@ const std = @import("std");
 const Network = @import("../network.zig").Network;
 const PRNG = @import("../prng.zig").PRNG;
 const Simulator = @import("../simulator.zig").Simulator; // Forward declare
-const Adaptor = @import("../db/adapter.zig");
 
 pub const ClientActor = struct {
     id: u32,
@@ -11,7 +10,6 @@ pub const ClientActor = struct {
     allocator: std.mem.Allocator,
     network: *Network,
     prng: *PRNG, // For choosing operations/keys
-    adaptor: *Adaptor.DbAdapter, // For database operations
 
     pub fn init(allocator: std.mem.Allocator, id: u32, network: *Network, prng: *PRNG) ClientActor {
         std.log.info("Initializing Client {}", .{id});
@@ -20,11 +18,6 @@ pub const ClientActor = struct {
             .id = id,
             .network = network,
             .prng = prng,
-            .adaptor = Adaptor.DbAdapter.init(allocator, Adaptor.DbType.RocksDB, Adaptor.DbConfig{
-                .path = "../../tmp/db", // Placeholder path, create a database at project dir
-            }) catch |err| {
-                std.log.err("Failed to initialize DbAdapter for Client {}: {}", .{ id, err });
-            },
         };
     }
 
