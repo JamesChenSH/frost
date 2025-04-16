@@ -124,6 +124,6 @@ pub fn build(b: *std.Build) void {
     db_adapter_tests.linkLibC();
 
     const run_db_adapter_tests = b.addRunArtifact(db_adapter_tests);
-    const db_adapter_test_step = b.step("test-adaptor", "Run DB Adapter tests");
+    const db_adapter_test_step = b.step("test-adapter", "Run DB Adapter tests");
     db_adapter_test_step.dependOn(&run_db_adapter_tests.step);
 }
