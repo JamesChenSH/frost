@@ -23,3 +23,9 @@ zig-cache/
 
 # macOS
 .DS_Store
+
+# Rocks API
+*/rocks
+*.o
+tmp
+

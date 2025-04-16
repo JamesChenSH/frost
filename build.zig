@@ -28,6 +28,21 @@ pub fn build(b: *std.Build) void {
     //     .optimize = optimize,
     // });
 
+    // This is the external settings for paths to different dependency libraries.
+    // ======================= //
+    //         RocksDB         //
+    // ======================= //
+    const rocksdb_prefix = b.option(
+        []const u8,
+        "Rocks-DB path",
+        "The path to rocksDB installation",
+    ) orelse "../rocksdb/";
+
+    const rocksdb_include_path = std.fs.path.join(b.allocator, &.{ rocksdb_prefix, "include" }) catch @panic("Failed to join RocksDB include path");
+    defer b.allocator.free(rocksdb_include_path);
+    const rocksdb_lib_path = std.fs.path.join(b.allocator, &.{ rocksdb_prefix, "" }) catch @panic("Failed to join RocksDB lib path");
+    defer b.allocator.free(rocksdb_lib_path);
+
     // We will also create a module for our other entry point, 'main.zig'.
     const exe_mod = b.createModule(.{
         // `root_source_file` is the Zig "entry point" of the module. If a module
@@ -45,6 +60,11 @@ pub fn build(b: *std.Build) void {
         .name = "frost",
         .root_module = exe_mod,
     });
+
+    exe.linkLibC();
+    exe.linkSystemLibrary("rocksdb");
+    exe.addIncludePath(b.path(rocksdb_include_path));
+    exe.addLibraryPath(b.path(rocksdb_lib_path));
 
     // Dependencies
     // zig-clap
@@ -90,4 +110,20 @@ pub fn build(b: *std.Build) void {
     // running the unit tests.
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    // DB Adapter test settings
+    const db_adapter_tests = b.addTest(.{
+        .root_source_file = b.path("src/db/adapter.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    db_adapter_tests.addIncludePath(b.path(rocksdb_include_path));
+    db_adapter_tests.addLibraryPath(b.path(rocksdb_lib_path));
+    db_adapter_tests.linkSystemLibrary("rocksdb");
+    db_adapter_tests.linkLibC();
+
+    const run_db_adapter_tests = b.addRunArtifact(db_adapter_tests);
+    const db_adapter_test_step = b.step("test-adapter", "Run DB Adapter tests");
+    db_adapter_test_step.dependOn(&run_db_adapter_tests.step);
 }
