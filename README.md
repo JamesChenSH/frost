@@ -49,7 +49,7 @@ The architecture of FRoST is roughly defined by the diagram below:
 
       https://github.com/apple/foundationdb/tree/main/tests/TestRunner
 
-      Evaluate rocksdb backend performance on dst. **Hanged**
+      Evaluate rocksdb backend performance on dst. **Stalled**
       https://github.com/apple/foundationdb/pull/11790
 
 - [ ] (IN PROGRESS: SHAOHONG) Evaluate RocksDB simulator standalone:
