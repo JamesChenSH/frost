@@ -11,10 +11,11 @@ pub const ClientActor = struct {
     network: *Network,
     prng: PRNG,
     num_replicas: u32,
+    client_request_probability: f32,
 
     // TODO: Add state for tracking pending operations & verification
 
-    pub fn init(allocator: std.mem.Allocator, id: u32, network: *Network, prng_seed: u64, num_replicas: u32) ClientActor {
+    pub fn init(allocator: std.mem.Allocator, id: u32, network: *Network, prng_seed: u64, num_replicas: u32, client_request_probability: f32) ClientActor {
         log.info("Initializing Client {}", .{id});
         if (num_replicas == 0) @panic("Client needs at least one replica to target");
         return ClientActor{
@@ -23,6 +24,7 @@ pub const ClientActor = struct {
             .network = network,
             .prng = PRNG.init(prng_seed),
             .num_replicas = num_replicas,
+            .client_request_probability = client_request_probability,
         };
     }
 
@@ -57,7 +59,7 @@ pub const ClientActor = struct {
     }
 
     pub fn step(self: *ClientActor, current_tick: u32) !void {
-        if (self.prng.random().float(f32) < 0.1) {
+        if (self.prng.random().float(f32) < self.client_request_probability) {
             const is_put = self.prng.random().boolean();
             const key_num = self.prng.random().uintLessThan(u64, 100);
             var key_buf: [32]u8 = undefined;

@@ -95,6 +95,7 @@ pub const Simulator = struct {
                 &network,
                 simulator_prng.random().int(u64),
                 simulation_config.num_replicas, // Pass replica count
+                simulation_config.client_request_probability,
             ));
             log.debug("Client {d} initialized successfully", .{client_id});
         }
