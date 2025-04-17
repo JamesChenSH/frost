@@ -94,7 +94,7 @@ pub const ClientActor = struct {
             request_payload = .{ .Get = .{ .client_id = self.id, .key = key_name } };
         }
 
-        const message = messages.SimMessage{ .source_id = self.id, .target_id = target_replica_id, .payload = .{ .Request = request_payload } };
-        try self.network.sendMessage(self.id, target_replica_id, message, current_tick);
+        // const message = messages.SimMessage{ .source_id = self.id, .target_id = target_replica_id, .payload = .{ .Request = request_payload } };
+        // try self.network.sendMessage(self.id, target_replica_id, message, current_tick);
     }
 };
