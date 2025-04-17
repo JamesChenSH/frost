@@ -46,11 +46,6 @@ pub const ClientActor = struct {
                             get_res.status,
                             get_res.value,
                         });
-                        // IMPORTANT: Free the value slice if present.
-                        if (get_res.value) |v| {
-                            log.debug("Client {} freeing received value slice (len {})", .{ self.id, v.len });
-                            self.allocator.free(v);
-                        }
                     },
                 }
                 // TODO: Match with pending op, verify history

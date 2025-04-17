@@ -22,32 +22,21 @@ pub const SimEvent = struct {
     tick: u32,
     payload: SimEventPayload,
 
-    // Renamed to 'compare' and updated signature/return type
-    pub fn compare(_: void, a: SimEvent, b: SimEvent) math.Order {
-        // Order based on tick: lower tick means "less than" (higher priority for min-heap)
-        if (a.tick < b.tick) {
-            return .lt;
-        } else if (a.tick > b.tick) {
-            return .gt;
-        } else {
-            // Events at the same tick are considered equal in order for now.
-            // Could add tie-breaking logic here if needed (e.g., based on event type or a sequence number).
-            return .eq;
-        }
+    pub fn lessThan(context: void, a: SimEvent, b: SimEvent) math.Order {
+        _ = context;
+        return math.order(a.tick, b.tick);
     }
 };
 
 // --- Scheduler ---
 pub const Scheduler = struct {
     allocator: std.mem.Allocator,
-    // Use the updated comparison function SimEvent.compare
-    event_queue: PriorityQueue(SimEvent, void, SimEvent.compare),
+    event_queue: PriorityQueue(SimEvent, void, SimEvent.lessThan),
 
     pub fn init(allocator: std.mem.Allocator) Scheduler {
         return Scheduler{
             .allocator = allocator,
-            // Pass the correct comparison function during init
-            .event_queue = PriorityQueue(SimEvent, void, SimEvent.compare).init(allocator, undefined),
+            .event_queue = PriorityQueue(SimEvent, void, SimEvent.lessThan).init(allocator, {}),
         };
     }
 
@@ -81,7 +70,7 @@ pub const Scheduler = struct {
 
     pub fn scheduleEvent(self: *Scheduler, tick: u32, payload: SimEventPayload) !void {
         const event = SimEvent{ .tick = tick, .payload = payload };
-        log.err("We out here test 1, event = {}", .{event});
+        log.debug("event_queue_cap = {}", .{self.event_queue.capacity()});
         try self.event_queue.add(event);
     }
 
