@@ -53,5 +53,5 @@ pub fn main() !void {
 
     try sim.run(); // Execute the main simulation loop
 
-    std.log.info("Simulation completed successfully.", .{});
+    std.log.info("Simulation completed successfully. Seed = {}", .{seed});
 }
