@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const default_sim_db_data: []const u8 = "./tmp";
 pub const default_max_ticks: u32 = 1_000_000;
 pub const default_num_replicas: u32 = 3;
 pub const default_num_clients: u32 = 2;

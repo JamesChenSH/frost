@@ -36,6 +36,8 @@ pub const DbError = error{
     UnknownDbType,
     /// The adapter or its underlying DB is not initialized.
     NotInitialized,
+    /// DB is not found
+    NotFound,
 };
 
 /// The generic Database Adapter.

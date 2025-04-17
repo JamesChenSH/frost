@@ -13,7 +13,7 @@ const db_adapter = @import("db/adapter.zig");
 const messages = @import("messages.zig");
 
 // Base path for simulation database directories
-const base_db_path = "./sim_db_data";
+const base_db_path = config.default_sim_db_data;
 
 pub const Simulator = struct {
     simulation_config: config.SimulationConfig,
@@ -54,14 +54,14 @@ pub const Simulator = struct {
 
         // --- Init Replicas ---
         log.info("Creating base DB directory: {s}", .{base_db_path});
-        try fs.cwd().makeDirRecursive(base_db_path);
+        try fs.cwd().makePath(base_db_path);
 
         errdefer { // Cleanup partially created replicas and paths
             log.warn("Error during replica init, cleaning up...", .{});
             for (replicas.items) |*r| r.deinit();
             for (replica_db_paths_list.items) |p| allocator.free(p);
         }
-        log.info("Initializing {} replicas", .{simulation_config.num_replicas});
+        log.info("Initializing {d} replicas", .{simulation_config.num_replicas});
         for (0..simulation_config.num_replicas) |i| {
             const replica_id: u32 = @intCast(i);
             const path = try std.fmt.allocPrint(allocator, "{s}/replica_{d}", .{ base_db_path, replica_id });
@@ -71,7 +71,7 @@ pub const Simulator = struct {
             // Append path *before* potentially failing Replica init
             try replica_db_paths_list.append(path);
 
-            log.debug("Attempting to init Replica {} with path {}", .{ replica_id, path });
+            log.debug("Attempting to init Replica {d} with path {s}", .{ replica_id, path });
             // Now that path is in the list, init the replica. If this fails, outer errdefer handles path cleanup.
             try replicas.append(try ReplicaActor.init(
                 allocator,
@@ -80,7 +80,7 @@ pub const Simulator = struct {
                 .RocksDB, // TODO: Use config value later
                 path, // Pass the allocated path slice
             ));
-            log.debug("Replica {} initialized successfully", .{replica_id});
+            log.debug("Replica {d} initialized successfully", .{replica_id});
         }
 
         // --- Init Clients ---
@@ -88,7 +88,7 @@ pub const Simulator = struct {
             log.warn("Error during client init, cleaning up...", .{});
             for (clients.items) |*c| c.deinit();
         }
-        log.info("Initializing {} clients", .{simulation_config.num_clients});
+        log.info("Initializing {d} clients", .{simulation_config.num_clients});
         for (0..simulation_config.num_clients) |i| {
             const client_id: u32 = @intCast(1000 + i);
             const client_prng = PRNG.init(client_prng_master.random().int(u64));
@@ -100,7 +100,7 @@ pub const Simulator = struct {
                 &client_prngs_list.items[i],
                 simulation_config.num_replicas, // Pass replica count
             ));
-            log.debug("Client {} initialized successfully", .{client_id});
+            log.debug("Client {d} initialized successfully", .{client_id});
         }
 
         log.info("Simulator init complete", .{});
@@ -172,11 +172,11 @@ pub const Simulator = struct {
             // 4. Replica steps are now driven by messages handled in runTick
 
             if (current_tick > 0 and current_tick % 200_000 == 0) { // Log progress less often
-                log.info("Tick {} / {}", .{ current_tick, self.simulation_config.max_ticks });
+                log.info("Tick {d} / {d}", .{ current_tick, self.simulation_config.max_ticks });
             }
         }
         // Final tick count might be max_ticks-1 because loop is 0..max_ticks
-        log.info("Simulation finished after {} ticks.", .{current_tick + 1});
+        log.info("Simulation finished after {d} ticks.", .{current_tick + 1});
     }
 
     fn updateReplicaStates(self: *Simulator, current_tick: u32) !void {
@@ -187,13 +187,13 @@ pub const Simulator = struct {
 
             if (initial_state == .Running) {
                 if (self.randomF32() < self.simulation_config.replica_pause_probability) {
-                    log.warn("Injecting PAUSE fault for Replica {} at tick {}", .{ replica.id, current_tick });
+                    log.warn("Injecting PAUSE fault for Replica {d} at tick {d}", .{ replica.id, current_tick });
                     replica.pauseReplica();
                     continue; // Don't try to resume in the same tick
                 }
             } else if (initial_state == .Paused) {
                 if (self.randomF32() < self.simulation_config.replica_resume_probability) {
-                    log.warn("Injecting RESUME event for Replica {} at tick {}", .{ replica.id, current_tick });
+                    log.warn("Injecting RESUME event for Replica {d} at tick {d}", .{ replica.id, current_tick });
                     replica.resumeReplica();
                 }
             }

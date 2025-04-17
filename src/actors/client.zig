@@ -9,7 +9,7 @@ pub const ClientActor = struct {
     id: u32,
     allocator: std.mem.Allocator,
     network: *Network,
-    prng: *PRNG, // For choosing operations/keys
+    prng: *PRNG,
     num_replicas: u32,
 
     // TODO: Add state for tracking pending operations & verification
@@ -62,68 +62,73 @@ pub const ClientActor = struct {
     }
 
     pub fn step(self: *ClientActor, current_tick: u32) !void {
-        // Workload: ~10% chance per tick to send one request
         if (self.prng.random().float(f32) < 0.1) {
             const is_put = self.prng.random().boolean();
-            const key_num = self.prng.random().uintLessThan(u64, 100); // Smaller key space
+            const key_num = self.prng.random().uintLessThan(u64, 100);
             var key_buf: [32]u8 = undefined;
-            // Using bufPrint is efficient but requires the buffer to be large enough.
-            const key_slice = std.fmt.bufPrint(&key_buf, "key_{d}", .{key_num}) catch |err| {
-                log.err("Failed to format key: {}", .{err});
-                return; // Skip this step on formatting error
+            const key_stack_slice = std.fmt.bufPrint(&key_buf, "key_{d}", .{key_num}) catch |err| {
+                log.err("Client {} failed to format key: {}", .{ self.id, err });
+                return;
             };
 
-            // Choose target replica
-            const target_replica_id = self.prng.random().uintLessThan(u32, self.num_replicas);
+            // --- Allocate heap copies ---
+            const key_heap_copy = try self.allocator.dupe(u8, key_stack_slice);
+            // Ensure heap copy is freed if subsequent operations fail
+            errdefer self.allocator.free(key_heap_copy);
 
-            var request_payload: messages.RequestPayload = undefined;
-            var temp_val_slice: ?[]u8 = null; // Hold temp value slice if needed
-
+            var val_heap_copy: ?[]u8 = null; // Use optional for value
             if (is_put) {
                 const val_num = self.prng.random().uintLessThan(u64, 1_000_000);
-                var val_buf: [64]u8 = undefined; // Larger buffer for value
-                const val_slice = std.fmt.bufPrint(&val_buf, "val_client{d}_tick{d}_rand{d}", .{ self.id, current_tick, val_num }) catch |err| {
-                    log.err("Failed to format value: {}", .{err});
+                var val_buf: [64]u8 = undefined;
+                const val_stack_slice = std.fmt.bufPrint(&val_buf, "val_client{d}_tick{d}_rand{d}", .{ self.id, current_tick, val_num }) catch |err| {
+                    log.err("Client {} failed to format value: {}", .{ self.id, err });
+                    // Don't forget to free the already allocated key copy before returning
+                    // errdefer already handles this
                     return;
                 };
-                temp_val_slice = val_slice; // Keep track for logging if needed
+                val_heap_copy = try self.allocator.dupe(u8, val_stack_slice);
+                // Ensure val copy is freed if message sending fails
+                errdefer if (val_heap_copy) |v| self.allocator.free(v);
+            }
+            // --- Copies allocated ---
 
-                log.debug("Client {} sending PUT key='{s}' val='{s}' to replica {}", .{ self.id, key_slice, val_slice, target_replica_id });
+            const target_replica_id = self.prng.random().uintLessThan(u32, self.num_replicas);
+            var request_payload: messages.RequestPayload = undefined;
 
+            if (is_put) {
+                // We checked above that val_heap_copy is non-null if is_put is true
+                const value = val_heap_copy.?;
+                log.debug("Client {} sending PUT key='{s}' val='{s}' to replica {}", .{ self.id, key_heap_copy, value, target_replica_id });
                 request_payload = .{
                     .Put = .{
                         .client_id = self.id,
-                        // Pass slices directly. Assumes they live long enough. See memory note below.
-                        .key = key_slice,
-                        .value = val_slice,
+                        .key = key_heap_copy, // Pass heap copy
+                        .value = value, // Pass heap copy
                     },
                 };
             } else {
-                log.debug("Client {} sending GET key='{s}' to replica {}", .{ self.id, key_slice, target_replica_id });
-                request_payload = .{ .Get = .{
-                    .client_id = self.id,
-                    .key = key_slice,
-                } };
+                log.debug("Client {} sending GET key='{s}' to replica {}", .{ self.id, key_heap_copy, target_replica_id });
+                request_payload = .{
+                    .Get = .{
+                        .client_id = self.id,
+                        .key = key_heap_copy, // Pass heap copy
+                    },
+                };
             }
 
-            // Memory Safety Note: We are passing slices (key_slice, val_slice) that point
-            // to memory on this function's stack (`key_buf`, `val_buf`). This is ONLY safe
-            // because:
-            // 1. Network latency is very low (1-5 ticks).
-            // 2. Scheduler processes events promptly.
-            // 3. Replica `handleMessage` processes the request immediately and doesn't store the slices.
-            // If latency increases or replicas queue requests, these stack buffers might be invalid
-            // by the time the message is processed.
-            // A robust solution MUST allocate copies of the key/value on the heap (using self.allocator)
-            // and pass those copies in the message. The receiving side (replica or message system)
-            // would then be responsible for freeing those copies.
+            // The message now contains slices pointing to heap memory owned by the message/scheduler.
             const message = messages.SimMessage{
                 .source_id = self.id,
                 .target_id = target_replica_id,
                 .payload = .{ .Request = request_payload },
             };
 
+            // Try sending the message. If this fails, the errdefers above will free the copies.
             try self.network.sendMessage(self.id, target_replica_id, message, current_tick);
+
+            // If sendMessage succeeds, ownership of the heap copies (key_heap_copy, val_heap_copy)
+            // has been transferred to the message/event system. We no longer free them here.
+            // The errdefers will NOT run on the success path.
 
             // TODO: Record operation invocation in history logger
         }

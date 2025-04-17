@@ -25,7 +25,7 @@ pub const ReplicaActor = struct {
         log.info("Initializing Replica {} with DB path: {s}", .{ id, db_path_arg });
 
         // Ensure DB directory exists
-        try fs.cwd().makePath(allocator, db_path_arg);
+        try fs.cwd().makePath(db_path_arg);
 
         const config = db_adapter.DbConfig{ .path = db_path_arg };
         // Initialize using DbInterfaces
@@ -55,7 +55,7 @@ pub const ReplicaActor = struct {
             // This is handled by scheduler's deinitEventPayload currently.
             return;
         }
-        const db_interface = self.db orelse {
+        var db_interface = self.db orelse {
             log.err("Replica {} DB not initialized!", .{self.id});
             // Optionally send error response
             return;
@@ -104,7 +104,7 @@ pub const ReplicaActor = struct {
                 const response_message = messages.SimMessage{
                     .source_id = self.id,
                     .target_id = client_id,
-                    .payload = response_payload,
+                    .payload = messages.MessagePayload{ .Response = response_payload },
                 };
                 // Pass current_tick for network latency calculation
                 try self.network.sendMessage(self.id, client_id, response_message, current_tick);
