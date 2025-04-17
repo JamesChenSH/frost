@@ -21,16 +21,16 @@ zvm use 0.14.0
 You can build the simulator in debug spec with
 
 ```bash
-zig build
+zig build --release=safe
 ```
 
-and run the simulator with
+which is the same release flags as TigerBeetle, and run the simulator with
 
 ```bash
 ./zig-out/bin/frost -h
 ```
 
-to view available flags to set.
+to view available flags to set. For determinism, if you set the same `seed`, you should get the same results.
 
 ## Architecture
 
