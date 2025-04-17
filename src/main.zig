@@ -6,9 +6,9 @@ const config = @import("config.zig");
 const Simulator = @import("simulator.zig").Simulator;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer gpa.deinit();
-    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     // CLI args using defaults from config.zig
     const params = comptime clap.parseParamsComptime(

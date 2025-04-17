@@ -9,14 +9,14 @@ const messages = @import("messages.zig");
 pub const Network = struct {
     allocator: std.mem.Allocator,
     scheduler: *Scheduler,
-    prng: *PRNG,
+    prng: PRNG, // Store struct directly
     // TODO: Add partition state, latency config from SimConfig
 
-    pub fn init(allocator: std.mem.Allocator, scheduler: *Scheduler, prng: *PRNG) Network {
+    pub fn init(allocator: std.mem.Allocator, scheduler: *Scheduler, prng_seed: u64) Network {
         return Network{
             .allocator = allocator,
             .scheduler = scheduler,
-            .prng = prng,
+            .prng = PRNG.init(prng_seed),
         };
     }
 

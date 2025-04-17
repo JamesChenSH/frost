@@ -9,19 +9,19 @@ pub const ClientActor = struct {
     id: u32,
     allocator: std.mem.Allocator,
     network: *Network,
-    prng: *PRNG,
+    prng: PRNG,
     num_replicas: u32,
 
     // TODO: Add state for tracking pending operations & verification
 
-    pub fn init(allocator: std.mem.Allocator, id: u32, network: *Network, prng: *PRNG, num_replicas: u32) ClientActor {
+    pub fn init(allocator: std.mem.Allocator, id: u32, network: *Network, prng_seed: u64, num_replicas: u32) ClientActor {
         log.info("Initializing Client {}", .{id});
         if (num_replicas == 0) @panic("Client needs at least one replica to target");
         return ClientActor{
             .allocator = allocator,
             .id = id,
             .network = network,
-            .prng = prng,
+            .prng = PRNG.init(prng_seed),
             .num_replicas = num_replicas,
         };
     }

@@ -35,8 +35,6 @@ pub const Simulator = struct {
     pub fn init(allocator: std.mem.Allocator, simulation_config: config.SimulationConfig) !Simulator {
         log.info("Simulator init start", .{});
         var simulator_prng = PRNG.init(simulation_config.seed);
-        var network_prng = PRNG.init(simulator_prng.random().int(u64));
-        var client_prng_master = PRNG.init(simulator_prng.random().int(u64));
 
         // Initialize lists first
         var replicas = std.ArrayList(ReplicaActor).init(allocator);
@@ -50,7 +48,7 @@ pub const Simulator = struct {
 
         // Init Scheduler & Network
         var scheduler = Scheduler.init(allocator);
-        var network = Network.init(allocator, &scheduler, &network_prng);
+        var network = Network.init(allocator, &scheduler, simulator_prng.random().int(u64));
 
         // --- Init Replicas ---
         log.info("Creating base DB directory: {s}", .{base_db_path});
@@ -91,13 +89,11 @@ pub const Simulator = struct {
         log.info("Initializing {d} clients", .{simulation_config.num_clients});
         for (0..simulation_config.num_clients) |i| {
             const client_id: u32 = @intCast(1000 + i);
-            const client_prng = PRNG.init(client_prng_master.random().int(u64));
-            try client_prngs_list.append(client_prng);
             try clients.append(ClientActor.init(
                 allocator,
                 client_id,
                 &network,
-                &client_prngs_list.items[i],
+                simulator_prng.random().int(u64),
                 simulation_config.num_replicas, // Pass replica count
             ));
             log.debug("Client {d} initialized successfully", .{client_id});
