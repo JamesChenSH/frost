@@ -36,7 +36,11 @@ pub const Simulator = struct {
         log.info("Simulator init start", .{});
         var simulator_prng = PRNG.init(simulation_config.seed);
 
-        // Initialize lists first
+        // Init Scheduler & Network
+        var scheduler = Scheduler.init(allocator);
+        var network = Network.init(allocator, &scheduler, simulator_prng.random().int(u64));
+
+        // Initialize lists after
         var replicas = std.ArrayList(ReplicaActor).init(allocator);
         errdefer replicas.deinit();
         var clients = std.ArrayList(ClientActor).init(allocator);
@@ -45,10 +49,6 @@ pub const Simulator = struct {
         errdefer client_prngs_list.deinit();
         var replica_db_paths_list = std.ArrayList([]u8).init(allocator); // Store mutable paths
         errdefer replica_db_paths_list.deinit();
-
-        // Init Scheduler & Network
-        var scheduler = Scheduler.init(allocator);
-        var network = Network.init(allocator, &scheduler, simulator_prng.random().int(u64));
 
         // --- Init Replicas ---
         log.info("Creating base DB directory: {s}", .{base_db_path});
