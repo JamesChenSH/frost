@@ -19,13 +19,14 @@ pub fn main() !void {
 
     // CLI args using defaults from config.zig
     const params = comptime clap.parseParamsComptime(
-        \\-h, --help              Display this help and exit.
-        \\-s, --seed <u64>        Simulation seed (default: random)
-        \\-t, --ticks <u32>       Max simulation ticks
-        \\-r, --replicas <u32>    Number of replicas
-        \\-c, --clients <u32>     Number of clients
-        \\    --pause_prob <f32>  Replica pause probability per tick
-        \\    --resume_prob <f32> Replica resume probability per tick
+        \\-h, --help                    Display this help and exit.
+        \\-s, --seed <u64>              Simulation seed (default: random)
+        \\-t, --ticks <u32>             Max simulation ticks
+        \\-r, --replicas <u32>          Number of replicas
+        \\-c, --clients <u32>           Number of clients
+        \\    --pause_prob <f32>        Replica pause probability per tick
+        \\    --resume_prob <f32>       Replica resume probability per tick
+        \\    --client_req_prob <f32>   Client request probability per tick
     );
 
     var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
@@ -50,6 +51,7 @@ pub fn main() !void {
         .num_clients = res.args.clients orelse config.default_num_clients,
         .replica_pause_probability = res.args.pause_prob orelse config.default_replica_pause_probability,
         .replica_resume_probability = res.args.resume_prob orelse config.default_replica_resume_probability,
+        .client_request_probability = res.args.client_req_prob orelse config.default_client_request_probability,
     };
 
     std.log.info("Initializing simulation with config: {any}", .{simulation_config});
