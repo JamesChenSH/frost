@@ -70,7 +70,6 @@ pub const Scheduler = struct {
 
     pub fn scheduleEvent(self: *Scheduler, tick: u32, payload: SimEventPayload) !void {
         const event = SimEvent{ .tick = tick, .payload = payload };
-        log.debug("event_queue_cap = {}", .{self.event_queue.capacity()});
         try self.event_queue.add(event);
     }
 
