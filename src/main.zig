@@ -6,9 +6,16 @@ const config = @import("config.zig");
 const Simulator = @import("simulator.zig").Simulator;
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+
+    // ARENA ALLOCATOR
+    // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    // defer arena.deinit();
+    // const allocator = arena.allocator();
+
+    // GPA ALLOCATOR __SAFER__
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     // CLI args using defaults from config.zig
     const params = comptime clap.parseParamsComptime(
