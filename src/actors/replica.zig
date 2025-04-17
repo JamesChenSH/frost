@@ -12,7 +12,7 @@ pub const ReplicaActor = struct {
     state: enum { Running, Paused, Crashed } = .Running,
     allocator: std.mem.Allocator,
     network: *Network,
-    db: ?db_adapter.DbInterfaces = null, // Use DbInterfaces now
+    db: ?db_adapter.DbAdapter = null, // Use DbAdapter now
     db_path: []const u8, // Path is owned by Simulator
 
     pub fn init(
@@ -28,8 +28,8 @@ pub const ReplicaActor = struct {
         try fs.cwd().makePath(db_path_arg);
 
         const config = db_adapter.DbConfig{ .path = db_path_arg };
-        // Initialize using DbInterfaces
-        const adapter = try db_adapter.DbInterfaces.init(allocator, db_type, config);
+        // Initialize using DbAdapter
+        const adapter = try db_adapter.DbAdapter.init(allocator, db_type, config);
 
         return ReplicaActor{
             .allocator = allocator,
@@ -43,7 +43,7 @@ pub const ReplicaActor = struct {
     pub fn deinit(self: *ReplicaActor) void {
         log.info("Deinitializing Replica {}", .{self.id});
         if (self.db) |*db_interface| {
-            db_interface.deinit(); // Call deinit on DbInterfaces
+            db_interface.deinit(); // Call deinit on DbAdapter
             self.db = null;
         }
     }

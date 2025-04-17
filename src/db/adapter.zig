@@ -43,14 +43,14 @@ pub const DbError = error{
 /// The generic Database Adapter.
 /// Callers interact with this struct, which dispatches calls
 /// to the appropriate concrete implementation stored in `impl`.
-pub const DbInterfaces = struct {
+pub const DbAdapter = struct {
     impl: DbImpl,
     allocator: Allocator, // Store allocator for deinit and potential other uses
 
     // --- Public Methods ---
 
     /// Initializes the database adapter with the specified backend type and config.
-    pub fn init(allocator: Allocator, db_type: DbType, config: DbConfig) !DbInterfaces {
+    pub fn init(allocator: Allocator, db_type: DbType, config: DbConfig) !DbAdapter {
         log.info("Initializing DbAdapter with type: {} and path: {s}", .{ db_type, config.path });
 
         const db_impl = switch (db_type) {
@@ -64,14 +64,14 @@ pub const DbInterfaces = struct {
             // else => return error.UnknownDbType, // if DbType allows it
         };
 
-        return DbInterfaces{
+        return DbAdapter{
             .impl = db_impl,
             .allocator = allocator,
         };
     }
 
     /// Deinitializes the adapter and releases resources held by the underlying database.
-    pub fn deinit(self: *DbInterfaces) void {
+    pub fn deinit(self: *DbAdapter) void {
         log.info("Deinitializing DbAdapter", .{});
         switch (self.impl) {
             .RocksDB => |*db| db.deinit(),
@@ -84,7 +84,7 @@ pub const DbInterfaces = struct {
     }
 
     /// Puts a key-value pair into the database.
-    pub fn put(self: *DbInterfaces, key: []const u8, value: []const u8) DbError!void {
+    pub fn put(self: *DbAdapter, key: []const u8, value: []const u8) DbError!void {
         return self.impl.put(key, value);
     }
 
@@ -92,7 +92,7 @@ pub const DbInterfaces = struct {
     /// Returns `null` if the key is not found.
     /// The caller owns the returned memory slice (if not null) and must free it
     /// using the provided `allocator`.
-    pub fn get(self: *DbInterfaces, key: []const u8, allocator: Allocator) DbError!?[]u8 {
+    pub fn get(self: *DbAdapter, key: []const u8, allocator: Allocator) DbError!?[]u8 {
         // Pass the allocator needed for the result allocation
         return self.impl.get(key, allocator);
     }
@@ -161,7 +161,7 @@ test "DbAdapter init, deinit with RocksDB" {
     const config = DbConfig{ .path = test_db_path };
 
     // Init
-    var db_intf = try DbInterfaces.init(allocator, .RocksDB, config);
+    var db_intf = try DbAdapter.init(allocator, .RocksDB, config);
     // Check if the allocator was stored (simple check)
     // try testing.expect(adapter.allocator.raw_allocator == allocator.raw_allocator);
     // Check if the impl is RocksDB
@@ -186,7 +186,7 @@ test "DbAdapter put and get with RocksDB" {
     }
 
     const config = DbConfig{ .path = test_db_path };
-    var db_intf = try DbInterfaces.init(allocator, .RocksDB, config);
+    var db_intf = try DbAdapter.init(allocator, .RocksDB, config);
     defer db_intf.deinit();
 
     const key1 = "mykey";
@@ -237,7 +237,7 @@ test "DbAdapter get non-existent key returns null" {
     }
 
     const config = DbConfig{ .path = test_db_path };
-    var db_intf = try DbInterfaces.init(allocator, .RocksDB, config);
+    var db_intf = try DbAdapter.init(allocator, .RocksDB, config);
     defer db_intf.deinit();
 
     const key_notfound = "this_key_does_not_exist";

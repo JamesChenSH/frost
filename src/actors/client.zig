@@ -59,75 +59,42 @@ pub const ClientActor = struct {
     }
 
     pub fn step(self: *ClientActor, current_tick: u32) !void {
-        if (self.prng.random().float(f32) < self.client_request_probability) {
-            const is_put = self.prng.random().boolean();
-            const key_num = self.prng.random().uintLessThan(u64, 100);
-            var key_buf: [32]u8 = undefined;
-            const key_stack_slice = std.fmt.bufPrint(&key_buf, "key_{d}", .{key_num}) catch |err| {
-                log.err("Client {} failed to format key: {}", .{ self.id, err });
-                return;
-            };
-
-            // --- Allocate heap copies ---
-            const key_heap_copy = try self.allocator.dupe(u8, key_stack_slice);
-            // Ensure heap copy is freed if subsequent operations fail
-            errdefer self.allocator.free(key_heap_copy);
-
-            var val_heap_copy: ?[]u8 = null; // Use optional for value
-            if (is_put) {
-                const val_num = self.prng.random().uintLessThan(u64, 1_000_000);
-                var val_buf: [64]u8 = undefined;
-                const val_stack_slice = std.fmt.bufPrint(&val_buf, "val_client{d}_tick{d}_rand{d}", .{ self.id, current_tick, val_num }) catch |err| {
-                    log.err("Client {} failed to format value: {}", .{ self.id, err });
-                    // Don't forget to free the already allocated key copy before returning
-                    // errdefer already handles this
-                    return;
-                };
-                val_heap_copy = try self.allocator.dupe(u8, val_stack_slice);
-                // Ensure val copy is freed if message sending fails
-                errdefer if (val_heap_copy) |v| self.allocator.free(v);
-            }
-            // --- Copies allocated ---
-
-            const target_replica_id = self.prng.random().uintLessThan(u32, self.num_replicas);
-            var request_payload: messages.RequestPayload = undefined;
-
-            if (is_put) {
-                // We checked above that val_heap_copy is non-null if is_put is true
-                const value = val_heap_copy.?;
-                log.debug("Client {} sending PUT key='{s}' val='{s}' to replica {}", .{ self.id, key_heap_copy, value, target_replica_id });
-                request_payload = .{
-                    .Put = .{
-                        .client_id = self.id,
-                        .key = key_heap_copy, // Pass heap copy
-                        .value = value, // Pass heap copy
-                    },
-                };
-            } else {
-                log.debug("Client {} sending GET key='{s}' to replica {}", .{ self.id, key_heap_copy, target_replica_id });
-                request_payload = .{
-                    .Get = .{
-                        .client_id = self.id,
-                        .key = key_heap_copy, // Pass heap copy
-                    },
-                };
-            }
-
-            // The message now contains slices pointing to heap memory owned by the message/scheduler.
-            const message = messages.SimMessage{
-                .source_id = self.id,
-                .target_id = target_replica_id,
-                .payload = .{ .Request = request_payload },
-            };
-
-            // Try sending the message. If this fails, the errdefers above will free the copies.
-            try self.network.sendMessage(self.id, target_replica_id, message, current_tick);
-
-            // If sendMessage succeeds, ownership of the heap copies (key_heap_copy, val_heap_copy)
-            // has been transferred to the message/event system. We no longer free them here.
-            // The errdefers will NOT run on the success path.
-
-            // TODO: Record operation invocation in history logger
+        // Early return if float is outside probability
+        if (self.prng.random().float(f32) > self.client_request_probability) {
+            return;
         }
+
+        // TODO Limit keys to up to 100, this is hard-coded, will adjust at a later time
+        // Basically want a high hit rate for now
+        // Use uintAtMostBiased for O(1) return and deterministic output
+        const key_num = self.prng.random().uintAtMostBiased(u8, 100);
+
+        // Keys should be only 8 bytes long, will be ok since key_name is max key_100 which is seven bytes including \0
+        var key_ptr: [8]u8 = undefined;
+        const key_name: []u8 = try std.fmt.bufPrint(&key_ptr, "key_{d}", .{key_num});
+
+        const target_replica_id = self.prng.random().uintLessThanBiased(u32, self.num_replicas);
+
+        var request_payload: messages.RequestPayload = undefined;
+
+        // Send PUT request if is_put is true, else send GET
+        const is_put = self.prng.random().boolean();
+        if (is_put) {
+            // Generate random value
+            const val_num = self.prng.random().uintAtMostBiased(u32, 1_000_000);
+            var val_ptr: [64]u8 = undefined;
+            const val_str = try std.fmt.bufPrint(&val_ptr, "val_client_{d}_tick_{d}_rand_{d}", .{ self.id, current_tick, val_num });
+
+            log.debug("Client {} sending PUT key='{s}' val='{s}' to replica {}", .{ self.id, key_name, val_str, target_replica_id });
+            request_payload = .{ .Put = .{ .client_id = self.id, .key = key_name, .value = val_str } };
+        } else {
+            // Else request is get
+            std.log.debug("Client {} sending GET key='{s}' to replica {}", .{ self.id, key_name, target_replica_id });
+
+            request_payload = .{ .Get = .{ .client_id = self.id, .key = key_name } };
+        }
+
+        const message = messages.SimMessage{ .source_id = self.id, .target_id = target_replica_id, .payload = .{ .Request = request_payload } };
+        try self.network.sendMessage(self.id, target_replica_id, message, current_tick);
     }
 };
