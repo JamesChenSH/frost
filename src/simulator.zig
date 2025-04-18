@@ -1,4 +1,7 @@
+// src/simulator.zig
 const std = @import("std");
+const fs = std.fs;
+const log = std.log.scoped(.simulator);
 
 const config = @import("config.zig");
 const PRNG = @import("prng.zig").PRNG;
@@ -6,10 +9,15 @@ const Scheduler = @import("scheduler.zig").Scheduler;
 const Network = @import("network.zig").Network;
 const ReplicaActor = @import("actors/replica.zig").ReplicaActor;
 const ClientActor = @import("actors/client.zig").ClientActor;
+const db_adapter = @import("db/adapter.zig");
+const messages = @import("messages.zig");
+
+// Base path for simulation database directories
+const base_db_path = config.default_sim_db_data;
 
 pub const Simulator = struct {
     simulation_config: config.SimulationConfig,
-    prng: PRNG, // Main PRNG for simulator-level decisions
+    prng: PRNG,
     allocator: std.mem.Allocator,
 
     // Core Components
@@ -18,55 +26,81 @@ pub const Simulator = struct {
     replicas: std.ArrayList(ReplicaActor),
     clients: std.ArrayList(ClientActor),
 
-    // Client PRNGs (Forked per client for determinism)
-    // Store them here or within ClientActor depending on preference
+    // Paths for replica DBs (owned by simulator)
+    replica_db_paths: std.ArrayList([]u8), // Store mutable slices
+
+    // Client PRNGs
     client_prngs: std.ArrayList(PRNG),
 
-    // TODO: Add History Recorder
-    // TODO: Add Checker/Verifier
-
     pub fn init(allocator: std.mem.Allocator, simulation_config: config.SimulationConfig) !Simulator {
+        log.info("Simulator init start", .{});
         var simulator_prng = PRNG.init(simulation_config.seed);
-        // Fork PRNGs deterministically *before* using the simulator_prng for anything else
-        var network_prng = PRNG.init(simulator_prng.random().int(u64));
-        var client_prng_master = PRNG.init(simulator_prng.random().int(u64));
 
+        // Init Scheduler & Network
         var scheduler = Scheduler.init(allocator);
-        var network = Network.init(allocator, &scheduler, &network_prng);
+        var network = Network.init(allocator, &scheduler, simulator_prng.random().int(u64));
 
+        // Initialize lists after
         var replicas = std.ArrayList(ReplicaActor).init(allocator);
-        errdefer replicas.deinit(); // Deinit already created replicas if client init fails below
-
+        errdefer replicas.deinit();
         var clients = std.ArrayList(ClientActor).init(allocator);
-        errdefer clients.deinit(); // Deinit client list if something below fails
-
+        errdefer clients.deinit();
         var client_prngs_list = std.ArrayList(PRNG).init(allocator);
-        errdefer client_prngs_list.deinit(); // Deinit PRNG list if something below fails
+        errdefer client_prngs_list.deinit();
+        var replica_db_paths_list = std.ArrayList([]u8).init(allocator); // Store mutable paths
+        errdefer replica_db_paths_list.deinit();
 
-        // Init Replicas
+        // --- Init Replicas ---
+        log.info("Creating base DB directory: {s}", .{base_db_path});
+        try fs.cwd().makePath(base_db_path);
+
+        errdefer { // Cleanup partially created replicas and paths
+            log.warn("Error during replica init, cleaning up...", .{});
+            for (replicas.items) |*r| r.deinit();
+            for (replica_db_paths_list.items) |p| allocator.free(p);
+        }
+        log.info("Initializing {d} replicas", .{simulation_config.num_replicas});
         for (0..simulation_config.num_replicas) |i| {
-            // Pass network, etc.
-            // Use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
-            // Since ReplicaActor expects a u32 and i is a usize
-            try replicas.append(ReplicaActor.init(allocator, @truncate(i), &network));
+            const replica_id: u32 = @intCast(i);
+            const path = try std.fmt.allocPrint(allocator, "{s}/replica_{d}", .{ base_db_path, replica_id });
+            // Must handle path allocation failure before appending
+            errdefer allocator.free(path);
+
+            // Append path *before* potentially failing Replica init
+            try replica_db_paths_list.append(path);
+
+            log.debug("Attempting to init Replica {d} with path {s}", .{ replica_id, path });
+            // Now that path is in the list, init the replica. If this fails, outer errdefer handles path cleanup.
+            try replicas.append(try ReplicaActor.init(
+                allocator,
+                replica_id,
+                &network,
+                .RocksDB, // TODO: Use config value later
+                path, // Pass the allocated path slice
+            ));
+            log.debug("Replica {d} initialized successfully", .{replica_id});
         }
 
-        // Init Clients and their PRNGs
-        errdefer { // More complex cleanup if client init fails mid-loop
+        // --- Init Clients ---
+        errdefer {
+            log.warn("Error during client init, cleaning up...", .{});
             for (clients.items) |*c| c.deinit();
-            // No need to deinit client_prngs items, they are structs
         }
+        log.info("Initializing {d} clients", .{simulation_config.num_clients});
         for (0..simulation_config.num_clients) |i| {
-            // Fork a PRNG for each client
-            const client_prng = PRNG.init(client_prng_master.random().int(u64));
-            try client_prngs_list.append(client_prng); // Store the PRNG
-            // Client ID = 1000 + i for distinctness
-            // Pass the corresponding PRNG by pointer
-            // Same as above. use @truncate since we know number of replicas cannot exceed u32_MAX, and usually be below 10
-            // Since ClientActor expects a u32 and i is a usize
-            try clients.append(ClientActor.init(allocator, @truncate(1000 + i), &network, &client_prngs_list.items[i]));
+            const client_id: u32 = @intCast(1000 + i);
+            try clients.append(ClientActor.init(
+                allocator,
+                client_id,
+                &network,
+                simulator_prng.random().int(u64),
+                simulation_config.num_replicas, // Pass replica count
+                simulation_config.client_request_probability,
+            ));
+            log.debug("Client {d} initialized successfully", .{client_id});
         }
 
+        log.info("Simulator init complete", .{});
         return Simulator{
             .simulation_config = simulation_config,
             .prng = simulator_prng,
@@ -75,23 +109,35 @@ pub const Simulator = struct {
             .network = network,
             .replicas = replicas,
             .clients = clients,
-            .client_prngs = client_prngs_list, // Own the list
+            .client_prngs = client_prngs_list,
+            .replica_db_paths = replica_db_paths_list,
         };
     }
 
     pub fn deinit(self: *Simulator) void {
-        std.log.info("Deinitializing simulation", .{});
+        log.info("Simulator deinit start", .{});
+        // Deinit actors first, releasing DB handles
         for (self.clients.items) |*c| c.deinit();
         self.clients.deinit();
-
-        // No need to deinit client_prngs items, just the list
-        self.client_prngs.deinit();
-
         for (self.replicas.items) |*r| r.deinit();
         self.replicas.deinit();
 
+        // Free allocated replica path strings
+        for (self.replica_db_paths.items) |p| self.allocator.free(p);
+        self.replica_db_paths.deinit();
+
+        // Deinit client PRNGs list
+        self.client_prngs.deinit();
+
+        // Deinit network and scheduler (scheduler deinit cleans event queue)
         self.network.deinit();
-        self.scheduler.deinit(); // Deinit scheduler last
+        self.scheduler.deinit();
+
+        // Optional: Clean up database directory after everything is closed
+        _ = fs.cwd().deleteTree(base_db_path) catch |err| {
+            log.warn("Could not delete DB data directory '{s}': {}", .{ base_db_path, err });
+        };
+        log.info("Simulator deinit complete.", .{});
     }
 
     pub fn randomU64(self: *Simulator) u64 {
@@ -103,70 +149,51 @@ pub const Simulator = struct {
     }
 
     pub fn run(self: *Simulator) !void {
-        std.log.info("Starting simulation run...", .{});
+        log.info("Starting simulation run...", .{});
         var current_tick: u32 = 0;
         for (0..self.simulation_config.max_ticks) |curr_tick_usize| {
             current_tick = @intCast(curr_tick_usize);
 
-            // 1. Update replica states (probabilistic)
+            // 1. Update replica states (faults/resume)
             try self.updateReplicaStates(current_tick);
 
-            // 2. Advance Scheduler & Process Events
-            try self.scheduler.runTick(&self.prng, current_tick);
-            // TODO: The scheduler should ideally tell the simulator which actors need stepping
-            // based on events (e.g., message delivery, timer expiry).
-
-            // 3. Execute Actor Steps (Placeholder - should be driven by scheduler)
-            // For now, give each actor a chance to run each tick deterministically
-            // Shuffling actor execution order might be needed for more complex scenarios.
-            // A simple approach: run clients then replicas. Deterministic order.
+            // 2. Execute Client Steps (Generate workload -> sends messages)
             for (self.clients.items) |*client| {
-                // Pass current tick for context/logging
                 try client.step(current_tick);
             }
-            for (self.replicas.items) |*replica| {
-                // Pass main PRNG for now if replica needs random decisions during its step
-                try replica.step(&self.prng);
-            }
 
-            if (current_tick % 500_000 == 0 and current_tick > 0) { // Log progress
-                std.log.info("Tick {} / {}", .{ current_tick, self.simulation_config.max_ticks });
+            // 3. Advance Scheduler & Process Events (incl. message delivery)
+            // Pass allocator for freeing message payloads if needed
+            try self.scheduler.runTick(self.allocator, &self.prng, current_tick, &self.clients, &self.replicas);
+
+            // 4. Replica steps are now driven by messages handled in runTick
+
+            if (current_tick > 0 and current_tick % 200_000 == 0) { // Log progress less often
+                log.info("Tick {d} / {d}", .{ current_tick, self.simulation_config.max_ticks });
             }
         }
-        std.log.info("Simulation finished after {} ticks.", .{current_tick});
-
-        // TODO: Run Verifier/Checker on recorded history
+        // Final tick count might be max_ticks-1 because loop is 0..max_ticks
+        log.info("Simulation finished after {d} ticks.", .{current_tick + 1});
     }
 
     fn updateReplicaStates(self: *Simulator, current_tick: u32) !void {
         // Iterate through replicas to update state
         for (self.replicas.items) |*replica| {
-            if (replica.state == .Crashed) continue; // Don't inject into crashed replicas
+            const initial_state = replica.state;
+            if (initial_state == .Crashed) continue;
 
-            // TODO: Not implemented
-            // Check Crash
-            // if (self.randomF32() < self.config.replica_crash_probability) {
-            //     std.log.warn("Injecting CRASH fault for Replica {} at tick {}", .{ replica.id, current_tick });
-            //     replica.crash();
-            //     continue; // Don't pause a replica that just crashed
-            // }
-
-            // Check Pause (only if running)
-            if (replica.state == .Running and self.randomF32() < self.simulation_config.replica_pause_probability) {
-                std.log.warn("Injecting PAUSE fault for Replica {} at tick {}", .{ replica.id, current_tick });
-                replica.pauseReplica();
-                // TODO: Schedule an EndPause event using the scheduler
-                // const pause_duration = 100 + @intCast(self.randomU64() % 900); // Example
-                // try self.scheduler.scheduleEvent(current_tick + pause_duration, .{ .resume_replica = replica.id });
-            }
-
-            // Resume paused states
-            if (replica.state == .Paused and self.randomF32() < self.simulation_config.replica_resume_probability) {
-                std.log.warn("RESUME event for Replica {} at tick {}", .{ replica.id, current_tick });
-                replica.resumeReplica();
+            if (initial_state == .Running) {
+                if (self.randomF32() < self.simulation_config.replica_pause_probability) {
+                    log.warn("Injecting PAUSE fault for Replica {d} at tick {d}", .{ replica.id, current_tick });
+                    replica.pauseReplica();
+                    continue; // Don't try to resume in the same tick
+                }
+            } else if (initial_state == .Paused) {
+                if (self.randomF32() < self.simulation_config.replica_resume_probability) {
+                    log.warn("Injecting RESUME event for Replica {d} at tick {d}", .{ replica.id, current_tick });
+                    replica.resumeReplica();
+                }
             }
         }
-
-        // TODO: Inject Network Faults (Partitions, High Latency)
     }
 };
